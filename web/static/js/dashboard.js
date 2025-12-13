@@ -165,6 +165,13 @@ function renderChart(history, events) {
         const maxPrice = Math.max(...visibleClose);
         const padding = (maxPrice - minPrice) * 0.05;
         layout.yaxis.range = [minPrice - padding, maxPrice + padding];
+
+        // TQQQ (Log) - Set range for log axis
+        const visibleTQQQ = tqqq.slice(startIdx);
+        const minTQQQ = Math.min(...visibleTQQQ);
+        const maxTQQQ = Math.max(...visibleTQQQ);
+        // For log axis, range is log10(value)
+        layout.yaxis3.range = [Math.log10(minTQQQ * 0.9), Math.log10(maxTQQQ * 1.1)];
     }
 
     Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
@@ -172,24 +179,28 @@ function renderChart(history, events) {
             // Link range updates? They are linked by matches: 'x'
             // Auto-scale Logic
             if (event['xaxis.range[0]'] || event['xaxis.range']) {
-                // ... (keep existing auto-scale logic for Price)
                 const xStart = event['xaxis.range[0]'] || event['xaxis.range'][0];
                 const xEnd = event['xaxis.range[1]'] || event['xaxis.range'][1];
-                // ... logic ...
+
                 const startIdx = dates.findIndex(d => d >= xStart);
                 let endIdx = dates.findIndex(d => d >= xEnd);
                 if (endIdx === -1) endIdx = dates.length - 1;
 
                 if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                    // Price
                     const visibleClose = close.slice(startIdx, endIdx);
                     const minPrice = Math.min(...visibleClose);
                     const maxPrice = Math.max(...visibleClose);
-
-                    // Pad by 5%
                     const padding = (maxPrice - minPrice) * 0.05;
 
+                    // TQQQ
+                    const visibleTQQQ = tqqq.slice(startIdx, endIdx);
+                    const minTQQQ = Math.min(...visibleTQQQ);
+                    const maxTQQQ = Math.max(...visibleTQQQ);
+
                     Plotly.relayout(gd, {
-                        'yaxis.range': [minPrice - padding, maxPrice + padding]
+                        'yaxis.range': [minPrice - padding, maxPrice + padding],
+                        'yaxis3.range': [Math.log10(minTQQQ * 0.9), Math.log10(maxTQQQ * 1.1)]
                     });
                 }
             }
