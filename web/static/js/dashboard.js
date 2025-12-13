@@ -32,12 +32,11 @@ function renderChart(history, events) {
     const close = history.map(d => d.Close);
     const sma = history.map(d => d.SMA_200);
     const rsi = history.map(d => d.RSI);
-    const lrsVal = history.map(d => d.LRS_Sniper_Value);
-    const bhVal = history.map(d => d.BH_TQQQ_Value);
+    // Equity data no longer needed for display
 
     // --- Layout Configuration ---
     const layout = {
-        grid: { rows: 3, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
+        grid: { rows: 2, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
         autosize: true,
         height: window.innerHeight - 100,
         paper_bgcolor: '#1a1a1a',
@@ -46,14 +45,26 @@ function renderChart(history, events) {
         showlegend: false,
 
         // Axis configuration
-        xaxis: { rangeslider: { visible: false }, showgrid: true, gridcolor: '#333' },
-        yaxis: { domain: [0.55, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
+        xaxis: {
+            rangeslider: { visible: false },
+            showgrid: true,
+            gridcolor: '#333',
+            rangeselector: {
+                buttons: [
+                    { count: 6, label: '6M', step: 'month', stepmode: 'backward' },
+                    { count: 1, label: '1Y', step: 'year', stepmode: 'backward' },
+                    { count: 5, label: '5Y', step: 'year', stepmode: 'backward' },
+                    { step: 'all', label: 'All' }
+                ],
+                font: { color: '#e0e0e0', size: 11 },
+                bgcolor: '#333',
+                activecolor: '#555'
+            }
+        },
+        yaxis: { domain: [0.40, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
 
-        xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', showticklabels: false },
-        yaxis2: { domain: [0.30, 0.50], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
-
-        xaxis3: { showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date' },
-        yaxis3: { domain: [0, 0.25], type: 'log', showgrid: true, gridcolor: '#333', title: 'Equity ($)' },
+        xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date' },
+        yaxis2: { domain: [0, 0.30], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
 
         // Annotations (Flags)
         annotations: events.map(e => createFlag(e))
@@ -81,9 +92,9 @@ function renderChart(history, events) {
         xaxis: 'x2', yaxis: 'y2'
     };
 
-    // RSI Zones
+    // RSI Zones (Thresholds: 39 and 50)
     const rsiLow = {
-        x: dates, y: Array(dates.length).fill(30), type: 'scatter', mode: 'lines',
+        x: dates, y: Array(dates.length).fill(39), type: 'scatter', mode: 'lines',
         line: { color: '#00ff88', width: 0.5, dash: 'dot' }, hoverinfo: 'none',
         xaxis: 'x2', yaxis: 'y2'
     };
@@ -93,23 +104,9 @@ function renderChart(history, events) {
         xaxis: 'x2', yaxis: 'y2'
     };
 
-    // 3. Equity
-    const traceLRS = {
-        x: dates, y: lrsVal, type: 'scatter', mode: 'lines',
-        name: 'Hybrid Sniper', line: { color: '#3388ff', width: 2 },
-        xaxis: 'x3', yaxis: 'y3'
-    };
-
-    const traceBH = {
-        x: dates, y: bhVal, type: 'scatter', mode: 'lines',
-        name: 'Buy & Hold TQQQ', line: { color: '#555', width: 1 },
-        xaxis: 'x3', yaxis: 'y3'
-    };
-
     const data = [
         tracePrice, traceSMA,
-        traceRSI, rsiLow, rsiHigh,
-        traceLRS, traceBH
+        traceRSI, rsiLow, rsiHigh
     ];
 
     Plotly.newPlot('chart-container', data, layout, { responsive: true });
