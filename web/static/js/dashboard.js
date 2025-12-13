@@ -109,6 +109,15 @@ function renderChart(history, events) {
         traceRSI, rsiLow, rsiHigh
     ];
 
+    // --- Default Range: 1 Year ---
+    const lastDate = new Date(dates[dates.length - 1]);
+    const oneYearAgo = new Date(lastDate);
+    oneYearAgo.setFullYear(lastDate.getFullYear() - 1);
+    const rangeStart = oneYearAgo.toISOString().split('T')[0];
+    const rangeEnd = dates[dates.length - 1];
+
+    layout.xaxis.range = [rangeStart, rangeEnd];
+
     Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
         gd.on('plotly_relayout', event => {
             // Auto-scale Y-axis based on visible X-range
