@@ -49,7 +49,7 @@ def api_data():
         data = data.astype(object).where(pd.notnull(data), None)
         
         # Select columns to convert
-        cols = ['Date', 'Close', 'SMA_200', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
+        cols = ['Date', 'Close', 'SMA_200', 'MA_10', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
         
         # Check if columns exist
         missing = [c for c in cols if c not in data.columns]

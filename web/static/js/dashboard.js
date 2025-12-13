@@ -109,6 +109,12 @@ function renderChart(history, events) {
         xaxis: 'x', yaxis: 'y'
     };
 
+    const traceMA10 = {
+        x: dates, y: history.map(d => d.MA_10), type: 'scatter', mode: 'lines',
+        name: 'MA 10', line: { color: '#2979ff', width: 1 },
+        xaxis: 'x', yaxis: 'y'
+    };
+
     const traceSMA = {
         x: dates, y: sma, type: 'scatter', mode: 'lines',
         name: 'SMA 200', line: { color: '#ffa500', width: 1, dash: 'dash' },
@@ -135,7 +141,7 @@ function renderChart(history, events) {
     };
 
     const data = [
-        tracePrice, traceSMA,
+        tracePrice, traceMA10, traceSMA,
         traceRSI, rsiLow, rsiHigh,
         traceTQQQ
     ];
