@@ -121,15 +121,32 @@ function renderChart(history, events) {
         xaxis: 'x', yaxis: 'y'
     };
 
-    // Buffer Magic
-    const traceSMAUpper = {
-        x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
-        name: '+2% Buffer', line: { color: '#ffa500', width: 0.5, dash: 'dot' }, opacity: 0.5,
-        hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
-    };
+    // Buffer Magic (Hysteresis Zone)
     const traceSMALower = {
         x: dates, y: history.map(d => d.SMA_200_Lower), type: 'scatter', mode: 'lines',
-        name: '-2% Buffer', line: { color: '#ffa500', width: 0.5, dash: 'dot' }, opacity: 0.5,
+        name: '-2% Buffer', line: { color: '#ffa500', width: 0, dash: 'dot' },
+        showlegend: false, hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
+    };
+
+    const traceSMAUpper = {
+        x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
+        name: 'Buffer Zone', line: { color: '#ffa500', width: 0, dash: 'dot' },
+        fill: 'tonexty', fillcolor: 'rgba(255, 165, 0, 0.1)', // Faint Orange Fill
+        hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
+    };
+
+    // Draw the actual lines on top if needed, or just keep the fill? 
+    // Let's draw dashed lines for the boundaries + fill.
+    // Redefining to ensure lines show.
+
+    const traceSMALowerLine = {
+        x: dates, y: history.map(d => d.SMA_200_Lower), type: 'scatter', mode: 'lines',
+        name: '-2% Buffer', line: { color: '#ffa500', width: 0.8, dash: 'dot' }, opacity: 0.6,
+        hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
+    };
+    const traceSMAUpperLine = {
+        x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
+        name: '+2% Buffer', line: { color: '#ffa500', width: 0.8, dash: 'dot' }, opacity: 0.6,
         hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
 
@@ -153,7 +170,9 @@ function renderChart(history, events) {
     };
 
     const data = [
-        tracePrice, traceMA10, traceSMA, traceSMAUpper, traceSMALower,
+        tracePrice, traceMA10, traceSMA,
+        traceSMALower, traceSMAUpper, // Fill
+        traceSMALowerLine, traceSMAUpperLine, // Lines on top
         traceRSI, rsiLow, rsiHigh,
         traceTQQQ
     ];
