@@ -1,27 +1,52 @@
-# Leverage Rotation Strategy (LRS) Backtest
+# Leverage Rotation Strategy (LRS) Backtest suite
 
-This project implements and backtests the "Leverage Rotation Strategy" described in the paper "Leverage for the Long Run" by Michael A. Gayed.
+This project implements, optimizes, and backtests various "Leverage Rotation Strategies" inspired by Michael A. Gayed's paper "Leverage for the Long Run".
 
-## Core Strategy
-- **Risk-On**: When S&P 500 is ABOVE its 200-day Simple Moving Average (SMA), hold a leveraged S&P 500 ETF (2x or 3x).
-- **Risk-Off**: When S&P 500 is BELOW its 200-day SMA, switch to cash/T-Bills.
+## Key Strategies Implemented
+
+### 1. Baseline LRS (The Standard)
+*   **Logic:** Long TQQQ (3x) when S&P 500 > SMA 200. Cash when Price < SMA 200.
+*   **Verdict:** Reduces drawdown significantly (-53% vs -81%) but lagged Buy & Hold TQQQ in the post-2010 bull run due to whipsaws.
+
+### 2. Golden Cross LRS (Robustness)
+*   **Logic:** Uses SMA(10) crossing SMA(200) instead of Price crossing SMA(200). 
+*   **Finding:** A **2% Hysteresis Buffer** on the MA(10) provided the most robust signals, filtering out noise.
+
+### 3. Hedged LRS (Real World Assets)
+*   **Logic:** Rotates into **SHV (Short Treasuries)** or **TMF (3x Long Treasuries)** instead of theoretical Cash.
+*   **Verdict:** SHV works perfectly as a Cash proxy. TMF **FAILED** due to the 2022 stock/bond correlation breakdown.
+
+### 4. Hybrid Sniper (THE WINNER)
+*   **Logic:** Solves the "SMA Lag" problem.
+    *   **Trend:** 100% TQQQ if Price > SMA 200.
+    *   **Sniper:** 50% TQQQ if Price < SMA 200 (Bear) AND **RSI(14) < 30** (Oversold).
+*   **Verdict:** **Active Alpha.** Beats Buy & Hold TQQQ while maintaining the safety profile of the Baseline LRS.
+    *   **CAGR:** 43.46% (vs 42% Buy & Hold)
+    *   **Max Drawdown:** -53.69% (vs -81.66% Buy & Hold)
 
 ## Project Structure
-- `lrs_backtest.py`: Main script to download data, run backtest, and generate results.
-- `data/`: Stores downloaded S&P 500 historical data.
-- `plots/`: Contains generated performance charts.
-- `results/`: Contains performance metrics and trade logs.
+*   `lrs_backtest.py`: Standard Baseline backtest.
+*   `lrs_hybrid_sniper.py`: **Main Script.** Runs the Hybrid Sniper strategy backtest and generates detailed trade plots.
+*   `generate_final_report.py`: Generates a high-level PDF Executive Summary.
+*   `summary.md`: Detailed research notes, trade logs, and analysis.
 
 ## Usage
-1.  Ensure you have Python installed and the virtual environment activated.
-2.  Install dependencies (if not already):
-    ```bash
-    pip install pandas numpy yfinance matplotlib
-    ```
-3.  Run the backtest:
-    ```bash
-    python lrs_backtest.py
-    ```
 
-## Results
-The script generates results for both 2x and 3x leverage scenarios. Check the `results/` folder for CSV summaries and `plots/` for visual performance comparisons.
+### 1. Run the Winning Strategy
+This generates trade plots in `plots/trades_comparison.pdf` and `plots/custom_plot_covid.pdf`.
+```bash
+python lrs_hybrid_sniper.py
+```
+
+### 2. Generate Executive Report
+This creates `results/LRS_Hybrid_Sniper_Report.pdf`.
+```bash
+python generate_final_report.py
+```
+
+## Requirements
+*   pandas
+*   numpy
+*   yfinance
+*   matplotlib
+*   reportlab
