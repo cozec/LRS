@@ -45,7 +45,8 @@ def api_data():
         data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
         
         # Replace NaN with null for JSON
-        data = data.where(pd.notnull(data), None)
+        # Cast to object first to ensure None is accepted in float columns
+        data = data.astype(object).where(pd.notnull(data), None)
         
         # Select columns to convert
         cols = ['Date', 'Close', 'SMA_200', 'RSI', 'Signal', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
