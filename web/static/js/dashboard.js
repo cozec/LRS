@@ -85,8 +85,10 @@ function renderChart(history, events) {
         annotations: events.flatMap(e => {
             const flags = [createFlag(e)]; // Always Price Flag
 
-            // Add RSI Flag for Sniper Signals
-            if (e.type.includes('SNIPER')) {
+            // Add RSI Flag for Sniper Signals OR Exit Signals
+            // Note: Trend signals don't necessarily have a specific RSI trigger point visualized here,
+            // but we can add them if desired. User specifically asked for "Exit Signal".
+            if (e.type.includes('SNIPER') || e.type.includes('EXIT')) {
                 flags.push(createRSIFlag(e));
             }
             return flags;
@@ -289,24 +291,34 @@ function createFlag(event) {
 }
 
 function createRSIFlag(event) {
-    // Similar to Sniper Flag but for RSI panel (y2)
+    let color = '#888';
+    let text = 'RSI';
+    let ay = -30; // Default Above
+
+    if (event.type.includes('SNIPER')) {
+        color = '#00ff88';
+        text = 'SNIPE';
+        ay = 30; // Below, pointing Up
+    } else if (event.type.includes('EXIT')) {
+        color = '#ff3333';
+        text = 'EXIT';
+        ay = -30; // Above, pointing Down
+    }
+
     return {
         x: event.date,
         y: event.rsi, // Use RSI value
         xref: 'x', // Shared X axis
         yref: 'y2', // RSI Axis
-        text: 'SNIPE',
+        text: text,
         showarrow: true,
         arrowhead: 2,
         ax: 0,
-        ay: -30, // Point down to the line? Or up?
-        // RSI is usually at bottom. Let's point down to the signal point.
-        // Actually, for purchase signal (Entry), usually below pointing up is good.
-        // But RSI space is cramped. Let's put it above pointing down.
-        arrowcolor: '#00ff88',
-        font: { color: '#00ff88', size: 9 },
+        ay: ay,
+        arrowcolor: color,
+        font: { color: color, size: 9 },
         bgcolor: '#1a1a1a',
-        bordercolor: '#00ff88',
+        bordercolor: color,
         borderwidth: 1,
         borderpad: 2,
         opacity: 0.8
