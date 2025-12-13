@@ -118,6 +118,16 @@ function renderChart(history, events) {
 
     layout.xaxis.range = [rangeStart, rangeEnd];
 
+    // Auto-Calculate Initial Y-Axis for 1 Year
+    const startIdx = dates.findIndex(d => d >= rangeStart);
+    if (startIdx !== -1) {
+        const visibleClose = close.slice(startIdx);
+        const minPrice = Math.min(...visibleClose);
+        const maxPrice = Math.max(...visibleClose);
+        const padding = (maxPrice - minPrice) * 0.05;
+        layout.yaxis.range = [minPrice - padding, maxPrice + padding];
+    }
+
     Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
         gd.on('plotly_relayout', event => {
             // Auto-scale Y-axis based on visible X-range
