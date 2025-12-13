@@ -94,6 +94,7 @@ def api_data():
                 events.append({
                     'date': date.strftime('%Y-%m-%d'),
                     'price': row['Close'],
+                    'rsi': row['RSI'],
                     'type': event_type,
                     'signal_new': state
                 })
