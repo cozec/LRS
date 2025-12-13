@@ -92,9 +92,9 @@ function renderChart(history, events) {
         xaxis: 'x2', yaxis: 'y2'
     };
 
-    // RSI Zones (Thresholds: 39 and 50)
+    // RSI Zones (Thresholds: 30 and 50)
     const rsiLow = {
-        x: dates, y: Array(dates.length).fill(39), type: 'scatter', mode: 'lines',
+        x: dates, y: Array(dates.length).fill(30), type: 'scatter', mode: 'lines',
         line: { color: '#00ff88', width: 0.5, dash: 'dot' }, hoverinfo: 'none',
         xaxis: 'x2', yaxis: 'y2'
     };
@@ -109,7 +109,33 @@ function renderChart(history, events) {
         traceRSI, rsiLow, rsiHigh
     ];
 
-    Plotly.newPlot('chart-container', data, layout, { responsive: true });
+    Plotly.newPlot('chart-container', data, layout, { responsive: true }).then(gd => {
+        gd.on('plotly_relayout', event => {
+            // Auto-scale Y-axis based on visible X-range
+            if (event['xaxis.range[0]'] || event['xaxis.range']) {
+                const xStart = event['xaxis.range[0]'] || event['xaxis.range'][0];
+                const xEnd = event['xaxis.range[1]'] || event['xaxis.range'][1];
+
+                // Find indices
+                const startIdx = dates.findIndex(d => d >= xStart);
+                let endIdx = dates.findIndex(d => d >= xEnd);
+                if (endIdx === -1) endIdx = dates.length - 1;
+
+                if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                    const visibleClose = close.slice(startIdx, endIdx);
+                    const minPrice = Math.min(...visibleClose);
+                    const maxPrice = Math.max(...visibleClose);
+
+                    // Pad by 5%
+                    const padding = (maxPrice - minPrice) * 0.05;
+
+                    Plotly.relayout(gd, {
+                        'yaxis.range': [minPrice - padding, maxPrice + padding]
+                    });
+                }
+            }
+        });
+    });
 
     // Remove loading spinner
     document.querySelector('.loading').remove();
