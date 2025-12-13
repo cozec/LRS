@@ -18,96 +18,55 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 warnings.filterwarnings('ignore')
 
+
 # Configuration
-START_DATE = '1990-01-01'  # Start date for historical data
+START_DATE = '1990-01-01'
 END_DATE = datetime.now().strftime('%Y-%m-%d')
 INITIAL_CAPITAL = 10000
-SMA_PERIOD = 200
-ANNUAL_FEE = 0.01  # 1% annual expense ratio for leveraged ETFs
-# DAILY_FEE = ANNUAL_FEE / 252 # No longer using fixed fee for TQQQ part, but keep for 2x
 DAILY_FEE = 0.01 / 252
-RISK_FREE_RATE = 0.03  # Approximate average T-Bill rate for Sharpe calculation
-BUFFER = 0 # 0% buffer (Removed)
+RISK_FREE_RATE = 0.03
+
+SMA_PERIOD = 200
+BUFFER = 0.02 # 2% buffer
 
 # Directories
 DATA_DIR = 'data'
 PLOTS_DIR = 'plots'
 RESULTS_DIR = 'results'
 
-
-def download_data():
-    """Download S&P 500 historical data from Yahoo Finance."""
-    print("Downloading S&P 500 data...")
-    sp500 = yf.download('^GSPC', start=START_DATE, end=END_DATE, progress=False)
-    
-    # Flatten multi-index columns if present
-    if isinstance(sp500.columns, pd.MultiIndex):
-        sp500.columns = sp500.columns.get_level_values(0)
-    
-    sp500.to_csv(os.path.join(DATA_DIR, 'sp500.csv'))
-    print(f"Downloaded {len(sp500)} days of S&P 500 data")
-    
-    # Download Nasdaq 100 for synthetic history
-    print("Downloading Nasdaq 100 data...")
-    ndx = yf.download('^NDX', start=START_DATE, end=END_DATE, progress=False)
-    if isinstance(ndx.columns, pd.MultiIndex):
-        ndx.columns = ndx.columns.get_level_values(0)
-    ndx.to_csv(os.path.join(DATA_DIR, 'ndx.csv'))
-    
-    # Download TQQQ
-    print("Downloading TQQQ data...")
-    tqqq = yf.download('TQQQ', start='2010-02-09', end=END_DATE, progress=False)
-    if isinstance(tqqq.columns, pd.MultiIndex):
-        tqqq.columns = tqqq.columns.get_level_values(0)
-    tqqq.to_csv(os.path.join(DATA_DIR, 'tqqq.csv'))
-    
-    # Download UPRO (SPX 3x) for plotting comparisons
-    print("Downloading UPRO data...")
-    upro = yf.download('UPRO', start='2009-06-25', end=END_DATE, progress=False)
-    if isinstance(upro.columns, pd.MultiIndex):
-        upro.columns = upro.columns.get_level_values(0)
-    upro.to_csv(os.path.join(DATA_DIR, 'upro.csv'))
-    
-    return sp500, ndx, tqqq, upro
-
-
 def calculate_signals(df):
     """Calculate 200-day SMA and generate buy/sell signals."""
     df = df.copy()
     df['SMA_200'] = df['Close'].rolling(window=SMA_PERIOD).mean()
-    df['MA_5'] = df['Close'].rolling(window=5).mean()
-    
-    # Regime: 1 = Risk-On (above SMA), 0 = Risk-Off (below SMA)
-    # df['Regime'] = (df['Close'] > df['SMA_200']).astype(int)
+    df['MA_10'] = df['Close'].rolling(window=10).mean() # Changed to MA 10
     
     # Apply Hysteresis (Buffer) Logic:
-    # - Switch to Risk-On (1) only if MA_5 > SMA * (1 + BUFFER)
-    # - Switch to Risk-Off (0) only if MA_5 < SMA * (1 - BUFFER)
-    # - Otherwise maintain previous state
+    # - Switch to Risk-On (1) only if MA_10 > SMA * (1 + BUFFER)
+    # - Switch to Risk-Off (0) only if MA_10 < SMA * (1 - BUFFER)
     
     regime = []
-    current_state = 0 # Assume start in Risk-Off or wait for first signal
+    current_state = 0 # Assume start in Risk-Off
     
     for i in range(len(df)):
         close = df['Close'].iloc[i]
-        ma5_price = df['MA_5'].iloc[i]
+        ma_price = df['MA_10'].iloc[i] # Use MA 10
         sma = df['SMA_200'].iloc[i]
         
-        if pd.isna(sma) or pd.isna(ma5_price):
+        if pd.isna(sma) or pd.isna(ma_price):
             regime.append(0)
             continue
             
         upper_band = sma * (1 + BUFFER)
         lower_band = sma * (1 - BUFFER)
         
-        # Use MA5 for signal to reduce noise
-        if ma5_price > upper_band:
+        if ma_price > upper_band:
             current_state = 1
-        elif ma5_price < lower_band:
+        elif ma_price < lower_band:
             current_state = 0
-        # else: ma5 is within buffer, keep current_state
+        # else: keep current_state
         
         regime.append(current_state)
+
         
     df['Regime'] = regime
 
@@ -325,7 +284,7 @@ def plot_trades(df, transactions):
             entry_date = pd.to_datetime(trade['Entry_Date'])
             exit_date = pd.to_datetime(trade['Exit_Date'])
             
-            # Define window (30 days padding)
+            # Define window (60 days padding)
             start_window = entry_date - pd.Timedelta(days=60)
             end_window = exit_date + pd.Timedelta(days=60)
             
@@ -336,13 +295,17 @@ def plot_trades(df, transactions):
             if subset.empty:
                 continue
             
-            # Use Global BH Values (Price proxy) directly - NO Normalization
-                
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12), sharex=True, gridspec_kw={'height_ratios': [1, 1, 1]})
+            # 2 Panels: Top = Signals, Bottom = TQQQ
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True, gridspec_kw={'height_ratios': [1, 1]})
             
             # --- Top Panel: SPX Signals ---
             ax1.plot(subset.index, subset['Close'], label='S&P 500', color='black', linewidth=1, alpha=0.6)
-            ax1.plot(subset.index, subset['MA_5'], label='MA 5', color='blue', linewidth=1)
+            # Use MA_10 if available, else MA_5 (for backwards compatibility if needed, but we switched to 10)
+            if 'MA_10' in subset.columns:
+                ax1.plot(subset.index, subset['MA_10'], label='MA 10', color='blue', linewidth=1)
+            else:
+                ax1.plot(subset.index, subset['MA_5'], label='MA 5', color='blue', linewidth=1)
+                
             ax1.plot(subset.index, subset['SMA_200'], label='200-day SMA', color='orange', linestyle='--', linewidth=1)
             
             # Mark Entry/Exit on SPX
@@ -354,43 +317,26 @@ def plot_trades(df, transactions):
             
             title_text = f"Trade #{idx} | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days) | S&P 500 Context"
             ax1.set_title(title_text, fontsize=11, fontweight='bold')
-            ax1.set_ylabel('S&P 500')
+            ax1.set_ylabel('S&P 500 Index')
             ax1.legend(loc='upper left', fontsize='small')
             ax1.grid(True, alpha=0.3)
             
-            # --- Middle Panel: SPX 3x (UPRO) ---
-            # Use Real UPRO Close Price
-            # If UPRO price is NaN (pre-2009), we might want to scale the Sim price to match, but for Post-2010 comparison it should exist.
-            
-            ax2.plot(subset.index, subset['UPRO_Close'], label='UPRO Price', color='navy', linewidth=1.5)
+            # --- Bottom Panel: TQQQ --- (Previously ax3)
+            # Use Real TQQQ Close Price
+            ax2.plot(subset.index, subset['TQQQ_Close'], label='TQQQ Price', color='purple', linewidth=1.5)
             ax2.axvspan(entry_date, exit_date, alpha=0.1, color='green', label='Active Trade')
-            ret_spx = trade['Return_SPX3x'] * 100
-            ax2.set_title(f"UPRO (SPX 3x) Performance: {ret_spx:.2f}%", fontsize=10, fontweight='bold')
-            ax2.set_ylabel('Price ($)')
-            ax2.grid(True, alpha=0.3)
-             # Mark markers
-            p_entry = subset.loc[subset.index >= entry_date, 'UPRO_Close'].iloc[0] if not subset.loc[subset.index >= entry_date].empty else None
-            p_exit = subset.loc[subset.index >= exit_date, 'UPRO_Close'].iloc[0] if not subset.loc[subset.index >= exit_date].empty else None
-            if p_entry: ax2.scatter(entry_date, p_entry, color='green', marker='^', s=80)
-            if p_exit: ax2.scatter(exit_date, p_exit, color='red', marker='v', s=80)
-
-            
-            # --- Bottom Panel: TQQQ ---
-             # Use Real TQQQ Close Price
-            ax3.plot(subset.index, subset['TQQQ_Close'], label='TQQQ Price', color='purple', linewidth=1.5)
-            ax3.axvspan(entry_date, exit_date, alpha=0.1, color='green', label='Active Trade')
             ret_tqqq = trade['Return_TQQQ'] * 100
             duration = trade['Duration_Days']
-            ax3.set_title(f"TQQQ Performance: {ret_tqqq:.2f}% ({duration} days)", fontsize=10, fontweight='bold')
-            ax3.set_ylabel('Price ($)')
-            ax3.grid(True, alpha=0.3)
+            ax2.set_title(f"TQQQ Performance: {ret_tqqq:.2f}% ({duration} days)", fontsize=10, fontweight='bold')
+            ax2.set_ylabel('TQQQ Price ($)')
+            ax2.grid(True, alpha=0.3)
              # Mark markers
             t_entry = subset.loc[subset.index >= entry_date, 'TQQQ_Close'].iloc[0] if not subset.loc[subset.index >= entry_date].empty else None
             t_exit = subset.loc[subset.index >= exit_date, 'TQQQ_Close'].iloc[0] if not subset.loc[subset.index >= exit_date].empty else None
-            if t_entry: ax3.scatter(entry_date, t_entry, color='green', marker='^', s=80)
-            if t_exit: ax3.scatter(exit_date, t_exit, color='red', marker='v', s=80)
+            if t_entry: ax2.scatter(entry_date, t_entry, color='green', marker='^', s=80)
+            if t_exit: ax2.scatter(exit_date, t_exit, color='red', marker='v', s=80)
             
-            plt.subplots_adjust(hspace=0.3)
+            plt.subplots_adjust(hspace=0.2)
             pdf.savefig(fig)
             plt.close(fig)
             
