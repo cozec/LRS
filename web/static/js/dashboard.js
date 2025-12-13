@@ -245,17 +245,17 @@ function renderChart(history, events) {
 function createFlag(event) {
     let color = '#888';
     let text = event.type;
-    let ay = -40; // Arrow length
+    let ay = -40; // Default (Above)
 
     if (event.type.includes('TREND')) {
-        color = '#00ff00'; // Bright Green (Signal)
-        ay = -60; // Slightly higher for emphasis
+        color = '#00ff00';
+        ay = 60; // Below, pointing Up
     } else if (event.type.includes('SNIPER')) {
-        color = '#00ff88'; // Teal/Green
-        ay = -40;
+        color = '#00ff88';
+        ay = 40; // Below, pointing Up
     } else if (event.type.includes('EXIT')) {
-        color = '#ff3333'; // Red
-        ay = -40;
+        color = '#ff3333';
+        ay = -40; // Only Exits stay above (pointing Down)
     }
 
     return {
