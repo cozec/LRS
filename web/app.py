@@ -44,14 +44,14 @@ def api_data():
         # Rename Date for JSON
         data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
         
-        # Replace NaN with null for JSON
-        # Cast to object first to ensure None is accepted in float columns
-        data = data.astype(object).where(pd.notnull(data), None)
-        
-        # Calculate 2% Buffer Bands (Buffer Magic)
+        # Calculate 2% Buffer Bands (Buffer Magic) BEFORE sanitization
         if 'SMA_200' in data.columns:
             data['SMA_200_Upper'] = data['SMA_200'] * 1.02
             data['SMA_200_Lower'] = data['SMA_200'] * 0.98
+
+        # Replace NaN with null for JSON
+        # Cast to object first to ensure None is accepted in float columns
+        data = data.astype(object).where(pd.notnull(data), None)
         
         # Select columns to convert
         cols = ['Date', 'Close', 'SMA_200', 'SMA_200_Upper', 'SMA_200_Lower', 'MA_10', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
