@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Sniper Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>LRS Hybrid Sniper</h1>
+            <span class="label">Real-Time Strategy Monitor</span>
+        </div>
+        
+        <div class="status-panel">
+            <div class="metric-card {{ status.mode_class }}">
+                <span class="label">Current Mode</span>
+                <span class="value">{{ status.mode }}</span>
+            </div>
+            
+            <div class="metric-card {{ 'bull' if status.price > status.sma_200 else 'bear' }}">
+                <span class="label">SPX Price</span>
+                <span class="value">${{ "{:,.2f}".format(status.price) }}</span>
+            </div>
+            
+            <div class="metric-card">
+                <span class="label">RSI (14)</span>
+                <span class="value" style="color: {{ '#00ff88' if status.rsi < 30 else '#ff3333' if status.rsi > 70 else '#e0e0e0' }}">
+                    {{ "{:.2f}".format(status.rsi) }}
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <div id="chart-container">
+        <div class="loading">Loading Finance Data...</div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

@@ -44,9 +44,17 @@ This creates `results/LRS_Hybrid_Sniper_Report.pdf`.
 python generate_final_report.py
 ```
 
+### 3. Launch Web Dashboard (Live Monitor)
+Host a local interactive website to visualize the strategy with Entry/Exit flags.
+```bash
+python web/app.py
+```
+Then open your browser to: [http://127.0.0.1:8050](http://127.0.0.1:8050)
+
 ## Requirements
 *   pandas
 *   numpy
 *   yfinance
 *   matplotlib
 *   reportlab
+*   flask
