@@ -48,8 +48,13 @@ def api_data():
         # Cast to object first to ensure None is accepted in float columns
         data = data.astype(object).where(pd.notnull(data), None)
         
+        # Calculate 2% Buffer Bands (Buffer Magic)
+        if 'SMA_200' in data.columns:
+            data['SMA_200_Upper'] = data['SMA_200'] * 1.02
+            data['SMA_200_Lower'] = data['SMA_200'] * 0.98
+        
         # Select columns to convert
-        cols = ['Date', 'Close', 'SMA_200', 'MA_10', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
+        cols = ['Date', 'Close', 'SMA_200', 'SMA_200_Upper', 'SMA_200_Lower', 'MA_10', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
         
         # Check if columns exist
         missing = [c for c in cols if c not in data.columns]

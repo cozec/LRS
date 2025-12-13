@@ -121,6 +121,18 @@ function renderChart(history, events) {
         xaxis: 'x', yaxis: 'y'
     };
 
+    // Buffer Magic
+    const traceSMAUpper = {
+        x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
+        name: '+2% Buffer', line: { color: '#ffa500', width: 0.5, dash: 'dot' }, opacity: 0.5,
+        hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
+    };
+    const traceSMALower = {
+        x: dates, y: history.map(d => d.SMA_200_Lower), type: 'scatter', mode: 'lines',
+        name: '-2% Buffer', line: { color: '#ffa500', width: 0.5, dash: 'dot' }, opacity: 0.5,
+        hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
+    };
+
     // 2. RSI
     const traceRSI = {
         x: dates, y: rsi, type: 'scatter', mode: 'lines',
@@ -141,7 +153,7 @@ function renderChart(history, events) {
     };
 
     const data = [
-        tracePrice, traceMA10, traceSMA,
+        tracePrice, traceMA10, traceSMA, traceSMAUpper, traceSMALower,
         traceRSI, rsiLow, rsiHigh,
         traceTQQQ
     ];
@@ -216,8 +228,11 @@ function createFlag(event) {
     let text = event.type;
     let ay = -40; // Arrow length
 
-    if (event.type.includes('ENTRY')) {
-        color = '#00ff88'; // Green
+    if (event.type.includes('TREND')) {
+        color = '#00ff00'; // Bright Green (Signal)
+        ay = -60; // Slightly higher for emphasis
+    } else if (event.type.includes('SNIPER')) {
+        color = '#00ff88'; // Teal/Green
         ay = -40;
     } else if (event.type.includes('EXIT')) {
         color = '#ff3333'; // Red
