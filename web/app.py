@@ -28,60 +28,74 @@ def index():
 
 @app.route('/api/data')
 def api_data():
-    df = load_data()
-    
-    # Reset index to get Date column
-    data = df.reset_index().copy()
-    
-    # Rename Date for JSON
-    data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
-    
-    # Replace NaN with null for JSON
-    data = data.where(pd.notnull(data), None)
-    
-    # Select columns to convert
-    cols = ['Date', 'Close', 'SMA_200', 'RSI', 'Signal', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
-    
-    # Convert to JSON records
-    result = data[cols].to_dict(orient='records')
-    
-    # Calculate Entry/Exit Flags
-    # We want to send specific events where Signal changed
-    # Re-calculate checks for client-side flags or send them pre-calculated?
-    # Sending full data allows client to zoom.
-    # Let's send a separate list of "events"
-    
-    events = []
-    # Identify signal changes
-    df['Signal_Change'] = df['Signal'].diff()
-    
-    # Changes
-    changes = df[df['Signal_Change'] != 0].dropna()
-    
-    for date, row in changes.iterrows():
-        # Determine Type
-        change = row['Signal_Change']
-        signal = row['Signal']
+    try:
+        df = load_data()
         
-        event_type = "UNKNOWN"
-        if change > 0: # Buy / Increase
-            if signal == 0.5: event_type = "SNIPER ENTRY"
-            elif signal == 1.0: event_type = "TREND ENTRY"
-        elif change < 0: # Sell / Decrease
-            if signal == 0.5: event_type = "PARTIAL EXIT" # 1.0 -> 0.5 (Unlikely in this logic)
-            elif signal == 0.0: event_type = "EXIT TO CASH"
+        # Reset index to get Date column
+        data = df.reset_index().copy()
+        
+        # Ensure 'Date' column exists (handle unnamed index)
+        if 'Date' not in data.columns:
+            if 'index' in data.columns:
+                data.rename(columns={'index': 'Date'}, inplace=True)
+            else:
+                return jsonify({'error': 'Date column missing in data'}), 500
+        
+        # Rename Date for JSON
+        data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
+        
+        # Replace NaN with null for JSON
+        data = data.where(pd.notnull(data), None)
+        
+        # Select columns to convert
+        cols = ['Date', 'Close', 'SMA_200', 'RSI', 'Signal', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
+        
+        # Check if columns exist
+        missing = [c for c in cols if c not in data.columns]
+        if missing:
+             return jsonify({'error': f'Missing columns: {missing}'}), 500
+        
+        # Convert to JSON records
+        result = data[cols].to_dict(orient='records')
+        
+        # Calculate Entry/Exit Flags
+        events = []
+        if 'Signal' in df.columns:
+             # Identify signal changes
+            df['Signal_Change'] = df['Signal'].diff()
             
-        events.append({
-            'date': date.strftime('%Y-%m-%d'),
-            'price': row['Close'],
-            'type': event_type,
-            'signal_new': signal
+            # Changes
+            changes = df[df['Signal_Change'] != 0].dropna()
+            
+            for date, row in changes.iterrows():
+                # Determine Type
+                change = row['Signal_Change']
+                signal = row['Signal']
+                
+                event_type = "UNKNOWN"
+                if change > 0: # Buy / Increase
+                    if signal == 0.5: event_type = "SNIPER ENTRY"
+                    elif signal == 1.0: event_type = "TREND ENTRY"
+                elif change < 0: # Sell / Decrease
+                    if signal == 0.5: event_type = "PARTIAL EXIT" 
+                    elif signal == 0.0: event_type = "EXIT TO CASH"
+                    
+                events.append({
+                    'date': date.strftime('%Y-%m-%d'),
+                    'price': row['Close'],
+                    'type': event_type,
+                    'signal_new': signal
+                })
+        
+        return jsonify({
+            'history': result,
+            'events': events
         })
         
-    return jsonify({
-        'history': result,
-        'events': events
-    })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=8050)

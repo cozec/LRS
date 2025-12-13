@@ -4,12 +4,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
 async function fetchData() {
     try {
+        // Check Plotly
+        if (typeof Plotly === 'undefined') {
+            throw new Error("Plotly.js library failed to load (CDN issue). Check internet connection.");
+        }
+
         const response = await fetch('/api/data');
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API Error ${response.status}: ${errText.substring(0, 100)}`);
+        }
+
         const data = await response.json();
+        if (data.error) {
+            throw new Error("Server Error: " + data.error);
+        }
+
         renderChart(data.history, data.events);
     } catch (error) {
-        console.error('Error fetching data:', error);
-        document.querySelector('.loading').textContent = 'Error Loading Data';
+        console.error('Error details:', error);
+        document.querySelector('.loading').innerHTML = `<span style="color: #ff3333; font-family: monospace;">${error.message}</span>`;
     }
 }
 
