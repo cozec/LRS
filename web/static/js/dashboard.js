@@ -215,6 +215,12 @@ function renderChart(history, events) {
         const maxTQQQ = Math.max(...visibleTQQQ);
         // For log axis, range is log10(value)
         layout.yaxis3.range = [Math.log10(minTQQQ * 0.9), Math.log10(maxTQQQ * 1.1)];
+
+        // RSI (Linear) - Auto Scale
+        const visibleRSI = rsi.slice(startIdx);
+        const minRSI = Math.min(...visibleRSI);
+        const maxRSI = Math.max(...visibleRSI);
+        layout.yaxis2.range = [Math.max(0, minRSI - 5), Math.min(100, maxRSI + 5)];
     }
 
     Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
@@ -241,9 +247,15 @@ function renderChart(history, events) {
                     const minTQQQ = Math.min(...visibleTQQQ);
                     const maxTQQQ = Math.max(...visibleTQQQ);
 
+                    // RSI
+                    const visibleRSI = rsi.slice(startIdx, endIdx);
+                    const minRSI = Math.min(...visibleRSI);
+                    const maxRSI = Math.max(...visibleRSI);
+
                     Plotly.relayout(gd, {
                         'yaxis.range': [minPrice - padding, maxPrice + padding],
-                        'yaxis3.range': [Math.log10(minTQQQ * 0.9), Math.log10(maxTQQQ * 1.1)]
+                        'yaxis3.range': [Math.log10(minTQQQ * 0.9), Math.log10(maxTQQQ * 1.1)],
+                        'yaxis2.range': [Math.max(0, minRSI - 5), Math.min(100, maxRSI + 5)]
                     });
                 }
             }
