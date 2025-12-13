@@ -49,7 +49,7 @@ def api_data():
         data = data.astype(object).where(pd.notnull(data), None)
         
         # Select columns to convert
-        cols = ['Date', 'Close', 'SMA_200', 'RSI', 'Signal', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
+        cols = ['Date', 'Close', 'SMA_200', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
         
         # Check if columns exist
         missing = [c for c in cols if c not in data.columns]
@@ -59,33 +59,38 @@ def api_data():
         # Convert to JSON records
         result = data[cols].to_dict(orient='records')
         
-        # Calculate Entry/Exit Flags
+        # Calculate Entry/Exit Flags (Use REGIME for Signal Date)
         events = []
-        if 'Signal' in df.columns:
-             # Identify signal changes
-            df['Signal_Change'] = df['Signal'].diff()
+        if 'Regime' in df.columns:
+             # Identify signal changes (Regime change = Signal generated at Close)
+            df['Regime_Change'] = df['Regime'].diff()
             
             # Changes
-            changes = df[df['Signal_Change'] != 0].dropna()
+            changes = df[df['Regime_Change'] != 0].dropna()
             
             for date, row in changes.iterrows():
                 # Determine Type
-                change = row['Signal_Change']
-                signal = row['Signal']
+                change = row['Regime_Change']
+                state = row['Regime']
                 
                 event_type = "UNKNOWN"
-                if change > 0: # Buy / Increase
-                    if signal == 0.5: event_type = "SNIPER ENTRY"
-                    elif signal == 1.0: event_type = "TREND ENTRY"
-                elif change < 0: # Sell / Decrease
-                    if signal == 0.5: event_type = "PARTIAL EXIT" 
-                    elif signal == 0.0: event_type = "EXIT TO CASH"
+                # Logic: 0.0 -> 0.5 (Sniper), 0.5 -> 1.0 (Trend), etc.
+                # However, Regime contains 0.0, 0.5, 1.0
+                
+                if state == 0.5 and (row['Regime_Change'] > 0 or row['Regime_Change'] == 0.5): 
+                    event_type = "SNIPER SIGNAL"
+                elif state == 1.0: 
+                    event_type = "TREND SIGNAL"
+                elif state == 0.0:
+                    event_type = "EXIT SIGNAL"
+                elif change < 0 and state == 0.5: # 1.0 -> 0.5
+                    event_type = "REDUCE SIGNAL"
                     
                 events.append({
                     'date': date.strftime('%Y-%m-%d'),
                     'price': row['Close'],
                     'type': event_type,
-                    'signal_new': signal
+                    'signal_new': state
                 })
         
         return jsonify({

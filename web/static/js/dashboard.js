@@ -34,21 +34,35 @@ function renderChart(history, events) {
     const rsi = history.map(d => d.RSI);
     // Equity data no longer needed for display
 
+    // 3. TQQQ
+    const tqqq = history.map(d => d.TQQQ_Close);
+    const traceTQQQ = {
+        x: dates, y: tqqq, type: 'scatter', mode: 'lines',
+        name: 'TQQQ', line: { color: '#00bcd4', width: 1.2 },
+        xaxis: 'x3', yaxis: 'y3'
+    };
+
     // --- Layout Configuration ---
     const layout = {
-        grid: { rows: 2, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
+        grid: { rows: 3, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
         autosize: true,
-        height: window.innerHeight - 100,
+        height: window.innerHeight - 50,
         paper_bgcolor: '#1a1a1a',
         plot_bgcolor: '#1a1a1a',
         font: { color: '#e0e0e0' },
         showlegend: false,
 
-        // Axis configuration
-        xaxis: {
-            rangeslider: { visible: false },
-            showgrid: true,
-            gridcolor: '#333',
+        // Axis configuration (Price)
+        xaxis: { rangeslider: { visible: false }, showgrid: true, gridcolor: '#333' },
+        yaxis: { domain: [0.60, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
+
+        // Axis 2 (RSI)
+        xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', showticklabels: false },
+        yaxis2: { domain: [0.35, 0.55], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
+
+        // Axis 3 (TQQQ)
+        xaxis3: {
+            showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date',
             rangeselector: {
                 buttons: [
                     { count: 6, label: '6M', step: 'month', stepmode: 'backward' },
@@ -58,17 +72,33 @@ function renderChart(history, events) {
                 ],
                 font: { color: '#e0e0e0', size: 11 },
                 bgcolor: '#333',
-                activecolor: '#555'
+                activecolor: '#555',
+                y: 1.2 // Move buttons above bottom chart or keep top? 
+                // Let's keep buttons on top chart but range linked? 
+                // Actually Plotly buttons usually go on the specific axis. 
+                // Let's put buttons on top axis (x1) for visibility.
             }
         },
-        yaxis: { domain: [0.40, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
+        yaxis3: { domain: [0, 0.30], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
 
-        xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date' },
-        yaxis2: { domain: [0, 0.30], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
-
-        // Annotations (Flags)
+        // Annotations (Flags) - Now using Signal Date
         annotations: events.map(e => createFlag(e))
     };
+
+    // Move rangeselector back to x1 for top visibility
+    layout.xaxis.rangeselector = {
+        buttons: [
+            { count: 6, label: '6M', step: 'month', stepmode: 'backward' },
+            { count: 1, label: '1Y', step: 'year', stepmode: 'backward' },
+            { count: 5, label: '5Y', step: 'year', stepmode: 'backward' },
+            { step: 'all', label: 'All' }
+        ],
+        font: { color: '#e0e0e0', size: 11 },
+        bgcolor: '#333',
+        activecolor: '#555',
+        x: 0, y: 1.05
+    };
+    delete layout.xaxis3.rangeselector;
 
     // --- Traces ---
 
@@ -106,8 +136,12 @@ function renderChart(history, events) {
 
     const data = [
         tracePrice, traceSMA,
-        traceRSI, rsiLow, rsiHigh
+        traceRSI, rsiLow, rsiHigh,
+        traceTQQQ
     ];
+
+    // Auto-Calculate Initial Y-Axis for 1 Year (Price)
+    // Also TQQQ if we want, but Price is main
 
     // --- Default Range: 1 Year ---
     const lastDate = new Date(dates[dates.length - 1]);
@@ -118,7 +152,6 @@ function renderChart(history, events) {
 
     layout.xaxis.range = [rangeStart, rangeEnd];
 
-    // Auto-Calculate Initial Y-Axis for 1 Year
     const startIdx = dates.findIndex(d => d >= rangeStart);
     if (startIdx !== -1) {
         const visibleClose = close.slice(startIdx);
@@ -130,12 +163,13 @@ function renderChart(history, events) {
 
     Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
         gd.on('plotly_relayout', event => {
-            // Auto-scale Y-axis based on visible X-range
+            // Link range updates? They are linked by matches: 'x'
+            // Auto-scale Logic
             if (event['xaxis.range[0]'] || event['xaxis.range']) {
+                // ... (keep existing auto-scale logic for Price)
                 const xStart = event['xaxis.range[0]'] || event['xaxis.range'][0];
                 const xEnd = event['xaxis.range[1]'] || event['xaxis.range'][1];
-
-                // Find indices
+                // ... logic ...
                 const startIdx = dates.findIndex(d => d >= xStart);
                 let endIdx = dates.findIndex(d => d >= xEnd);
                 if (endIdx === -1) endIdx = dates.length - 1;
