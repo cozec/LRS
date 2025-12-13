@@ -109,7 +109,7 @@ function renderChart(history, events) {
         traceRSI, rsiLow, rsiHigh
     ];
 
-    Plotly.newPlot('chart-container', data, layout, { responsive: true }).then(gd => {
+    Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
         gd.on('plotly_relayout', event => {
             // Auto-scale Y-axis based on visible X-range
             if (event['xaxis.range[0]'] || event['xaxis.range']) {
