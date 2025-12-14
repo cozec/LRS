@@ -2,20 +2,20 @@
 ## 0. Strategy Mechanics
 How the "Hybrid Sniper" manages risk and opportunity:
 
-> **Note:** All moving averages (MA10, SMA200) and RSI are calculated from the **S&P 500** price, not TQQQ.
+> **Note:** All moving averages (MA10, MA200) and RSI are calculated from the **S&P 500** price, not TQQQ.
 
 **1. Trend Mode (The Shield)**
-*   **Entry Condition:** `MA10 > SMA200 * 1.02` (10-day MA crosses above the +2% buffer of the 200-day SMA).
+*   **Entry Condition:** `MA10 > MA200 * 1.02` (10-day MA crosses above the +2% buffer of the 200-day SMA).
 *   **Action:** 100% Allocation to TQQQ.
 *   **Goal:** Capture the bulk of long-term bull markets.
-*   **Exit Condition:** `MA10 < SMA200 * 0.98` (MA crosses below the -2% buffer).
+*   **Exit Condition:** `MA10 < MA200 * 0.98` (MA crosses below the -2% buffer).
 
 **2. Sniper Mode (The Spear)**
-*   **Entry Condition:** In Bear zone (`MA10 < SMA200 * 0.98`) **AND** `RSI(14) < 30` (Panic Selling).
+*   **Entry Condition:** In Bear zone (`MA10 < MA200 * 0.98`) **AND** `RSI(14) < 30` (Panic Selling).
 *   **Action:** 50% Allocation to TQQQ (Starter Position).
-*   **Goal:** Catch "V-Bottom" reversals that the MA10/SMA200 crossover is too slow to identify.
+*   **Goal:** Catch "V-Bottom" reversals that the MA10/MA200 crossover is too slow to identify.
 *   **Exit (Profit Take):** If `RSI(14) > 50` (Mean Reversion), sell the position and return to Cash.
-*   **Promotion:** If the market rallies enough for `MA10 > SMA200 * 1.02`, the position scales up to 100% (Trend Mode).
+*   **Promotion:** If the market rallies enough for `MA10 > MA200 * 1.02`, the position scales up to 100% (Trend Mode).
 
 
 ## 1. Golden Cross Filter Optimization (TQQQ: 2010 - 2025)
@@ -46,9 +46,9 @@ Comparison of using different Moving Average (MA) lengths to trigger the crossov
 The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by aggressively entering early during oversold conditions.
 
 **Configuration:**
-*   **Trend Entry (100% TQQQ):** `MA10 > SMA200 * 1.02` (MA crosses above +2% buffer).
-*   **Trend Exit (0% / Cash):** `MA10 < SMA200 * 0.98` (MA crosses below -2% buffer).
-*   **Sniper Entry (50% TQQQ):** While in Bear zone (MA10 < SMA200 * 0.98) AND `RSI(14) < 30` (Deep Oversold).
+*   **Trend Entry (100% TQQQ):** `MA10 > MA200 * 1.02` (MA crosses above +2% buffer).
+*   **Trend Exit (0% / Cash):** `MA10 < MA200 * 0.98` (MA crosses below -2% buffer).
+*   **Sniper Entry (50% TQQQ):** While in Bear zone (MA10 < MA200 * 0.98) AND `RSI(14) < 30` (Deep Oversold).
 *   **Sniper Exit:** Sell the 50% position if `RSI > 50` (Profit Take) OR hold until Trend Entry confirms (scale up to 100%).
 
 | Strategy | CAGR | Max Drawdown | Final Value (\$10k) |
