@@ -57,6 +57,24 @@ The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by agg
 | **LRS TQQQ (Baseline)** | 38.50% | -53.23% | \$1,792,759 |
 | **Hybrid Sniper (RSI)** | **43.46%** | **-53.69%** | **\$3,126,043** |
 
+### Professional Metrics Comparison
+
+| Metric | Direction | Buy & Hold | Baseline | Sniper | Winner |
+|--------|:---------:|:----------:|:--------:|:------:|:------:|
+| **CAGR** | ↑ | 40.44% | 29.71% | **41.69%** | 🏆 Sniper |
+| **Max Drawdown** | ↓ | -81.66% | -60.30% | **-57.54%** | 🏆 Sniper |
+| **Volatility** | ↓ | 61.32% | **44.22%** | 47.73% | 🏆 Baseline |
+| **Sharpe Ratio** | ↑ | 0.82 | 0.74 | **0.91** | 🏆 Sniper |
+| **Sortino Ratio** | ↑ | 0.78 | 0.70 | **0.95** | 🏆 Sniper |
+| **Calmar Ratio** | ↑ | 0.50 | 0.49 | **0.72** | 🏆 Sniper |
+| **Beta** | ↓ | 1.00 | **0.52** | 0.64 | 🏆 Baseline |
+| **Alpha** | ↑ | -12.56% | +0.75% | **+6.54%** | 🏆 Sniper |
+| **Win Rate** | ↑ | 55.9% | 56.2% | **56.6%** | 🏆 Sniper |
+| **Worst Day** | ↓ | -34.47% | **-15.36%** | -20.31% | 🏆 Baseline |
+| **Profit Factor** | ↑ | 1.17 | 1.17 | **1.20** | 🏆 Sniper |
+
+> **Legend:** ↑ = Higher is better | ↓ = Lower is better
+
 **Indicator Details:**
 *   **Indicator:** Relative Strength Index (RSI).
 *   **Period:** 14 days.
