@@ -61,10 +61,10 @@ The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by agg
 
 | Cash Assumption | CAGR | Max Drawdown | Final Value |
 |-----------------|------|--------------|-------------|
-| **3% Cash (T-Bills)** | 42.41% | -57.52% | \$2,027,173 |
-| **0% Cash (Idle)** | 41.69% | -57.54% | \$1,877,263 |
+| **3% Cash (T-Bills)** | 42.85% | -53.69% | \$2,940,653 |
+| **0% Cash (Idle)** | 41.96% | -54.92% | \$2,660,000 |
 
-> The 3% cash assumption adds ~0.7% CAGR and ~\$150k over 15 years.
+> The 3% cash assumption adds ~0.9% CAGR and ~\$280k over 15 years. All results in this report use **3% Cash** unless noted otherwise.
 
 ### Professional Metrics Comparison
 
