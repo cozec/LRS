@@ -303,7 +303,12 @@ def plot_trades(df, transactions):
             ax1.plot(subset.index, subset['Close'], label='S&P 500', color='black', linewidth=1, alpha=0.6)
             if 'MA_10' in subset.columns:
                 ax1.plot(subset.index, subset['MA_10'], label='MA 10', color='blue', linewidth=1)
-            ax1.plot(subset.index, subset['SMA_200'], label='200-day SMA', color='orange', linestyle='--', linewidth=1)
+            ax1.plot(subset.index, subset['SMA_200'], label='MA 200', color='orange', linestyle='--', linewidth=1)
+            
+            # Shaded Buffer Zone (±2%)
+            upper_buffer = subset['SMA_200'] * 1.02
+            lower_buffer = subset['SMA_200'] * 0.98
+            ax1.fill_between(subset.index, lower_buffer, upper_buffer, color='orange', alpha=0.15, label='±2% Buffer')
             
             # Determine Reasons
             trade_type = trade.get('Type', 'Unknown')
@@ -399,7 +404,12 @@ def plot_custom_range(df, start_date, end_date, output_filename='custom_plot_cov
     ax1.plot(subset.index, subset['Close'], label='S&P 500', color='black', linewidth=1, alpha=0.6)
     if 'MA_10' in subset.columns:
         ax1.plot(subset.index, subset['MA_10'], label='MA 10', color='blue', linewidth=1)
-    ax1.plot(subset.index, subset['SMA_200'], label='200-day SMA', color='orange', linestyle='--', linewidth=1)
+    ax1.plot(subset.index, subset['SMA_200'], label='MA 200', color='orange', linestyle='--', linewidth=1)
+    
+    # Shaded Buffer Zone (±2%)
+    upper_buffer = subset['SMA_200'] * 1.02
+    lower_buffer = subset['SMA_200'] * 0.98
+    ax1.fill_between(subset.index, lower_buffer, upper_buffer, color='orange', alpha=0.15, label='±2% Buffer')
     
     # Identify Entries and Exits within this window
     # We reconstruct entry/exit events from Signal changes
