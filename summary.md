@@ -1,6 +1,24 @@
 # Leverage Rotation Strategy (LRS) Backtest Results
+## 0. Strategy Mechanics
+How the "Hybrid Sniper" manages risk and opportunity:
 
-## 3. Golden Cross Filter Optimization (TQQQ: 2010 - 2025)
+> **Note:** All moving averages (MA10, SMA200) and RSI are calculated from the **S&P 500** price, not TQQQ.
+
+**1. Trend Mode (The Shield)**
+*   **Entry Condition:** `MA10 > SMA200 * 1.02` (10-day MA crosses above the +2% buffer of the 200-day SMA).
+*   **Action:** 100% Allocation to TQQQ.
+*   **Goal:** Capture the bulk of long-term bull markets.
+*   **Exit Condition:** `MA10 < SMA200 * 0.98` (MA crosses below the -2% buffer).
+
+**2. Sniper Mode (The Spear)**
+*   **Entry Condition:** In Bear zone (`MA10 < SMA200 * 0.98`) **AND** `RSI(14) < 30` (Panic Selling).
+*   **Action:** 50% Allocation to TQQQ (Starter Position).
+*   **Goal:** Catch "V-Bottom" reversals that the MA10/SMA200 crossover is too slow to identify.
+*   **Exit (Profit Take):** If `RSI(14) > 50` (Mean Reversion), sell the position and return to Cash.
+*   **Promotion:** If the market rallies enough for `MA10 > SMA200 * 1.02`, the position scales up to 100% (Trend Mode).
+
+
+## 1. Golden Cross Filter Optimization (TQQQ: 2010 - 2025)
 Comparison of using different Moving Average (MA) lengths to trigger the crossover versus the 200-day SMA, instead of using raw Price.
 
 **Trigger:** `MA(n) > MA(200)`
@@ -24,7 +42,7 @@ Comparison of using different Moving Average (MA) lengths to trigger the crossov
     *   **3% Buffer ($622k)**: Too wide. It delayed re-entry too much.
 4.  **Conclusion:** The **10-day SMA crossover with a 2% hysteresis buffer** is the most robust active strategy identified.
 
-### 8. WINNER: The "Hybrid Sniper" Strategy (RSI Re-Entry)
+## 2. WINNER: The "Hybrid Sniper" Strategy (RSI Re-Entry)
 The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by aggressively entering early during oversold conditions.
 
 **Configuration:**
@@ -38,22 +56,6 @@ The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by agg
 | **Buy & Hold TQQQ** | 42.17% | -81.66% | \$2,716,246 |
 | **LRS TQQQ (Baseline)** | 38.50% | -53.23% | \$1,792,759 |
 | **Hybrid Sniper (RSI)** | **43.46%** | **-53.69%** | **\$3,126,043** |
-
-### Strategy Mechanics
-How the "Hybrid Sniper" manages risk and opportunity:
-
-**1. Trend Mode (The Shield)**
-*   **Entry Condition:** `MA10 > SMA200 * 1.02` (10-day MA crosses above the +2% buffer of the 200-day SMA).
-*   **Action:** 100% Allocation to TQQQ.
-*   **Goal:** Capture the bulk of long-term bull markets.
-*   **Exit Condition:** `MA10 < SMA200 * 0.98` (MA crosses below the -2% buffer).
-
-**2. Sniper Mode (The Spear)**
-*   **Entry Condition:** In Bear zone (`MA10 < SMA200 * 0.98`) **AND** `RSI(14) < 30` (Panic Selling).
-*   **Action:** 50% Allocation to TQQQ (Starter Position).
-*   **Goal:** Catch "V-Bottom" reversals that the MA10/SMA200 crossover is too slow to identify.
-*   **Exit (Profit Take):** If `RSI(14) > 50` (Mean Reversion), sell the position and return to Cash.
-*   **Promotion:** If the market rallies enough for `MA10 > SMA200 * 1.02`, the position scales up to 100% (Trend Mode).
 
 **Indicator Details:**
 *   **Indicator:** Relative Strength Index (RSI).
