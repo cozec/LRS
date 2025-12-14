@@ -53,9 +53,9 @@ The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by agg
 
 | Strategy | CAGR | Max Drawdown | Final Value (\$10k) |
 | :--- | :--- | :--- | :--- |
-| **Buy & Hold TQQQ** | 42.17% | -81.66% | \$2,716,246 |
-| **LRS TQQQ (Baseline)** | 38.50% | -53.23% | \$1,792,759 |
-| **Hybrid Sniper (RSI)** | **43.46%** | **-53.69%** | **\$3,126,043** |
+| **Buy & Hold TQQQ** | 41.56% | -81.66% | \$2,555,157 |
+| **LRS TQQQ (Baseline)** | 37.92% | -53.23% | \$1,686,440 |
+| **Hybrid Sniper (RSI)** | **42.85%** | **-53.69%** | **\$2,940,653** |
 
 #### Sensitivity: Cash Return Assumption
 
