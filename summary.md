@@ -28,9 +28,10 @@ Comparison of using different Moving Average (MA) lengths to trigger the crossov
 The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by aggressively entering early during oversold conditions.
 
 **Configuration:**
-*   **Trend Filter:** Bullish if Price > SMA 200 (100% TQQQ).
-*   **Sniper Entry:** If Price < SMA 200 AND **RSI(14) < 30** (Deep Oversold), buy a **50% TQQQ** Starter Position.
-*   **Sniper Exit:** Sell the 50% position if **RSI > 50** (Profit Take) OR hold until Trend Filter confirms (Add to 100%).
+*   **Trend Entry (100% TQQQ):** `MA10 > SMA200 * 1.02` (MA crosses above +2% buffer).
+*   **Trend Exit (0% / Cash):** `MA10 < SMA200 * 0.98` (MA crosses below -2% buffer).
+*   **Sniper Entry (50% TQQQ):** While in Bear zone (MA10 < SMA200 * 0.98) AND `RSI(14) < 30` (Deep Oversold).
+*   **Sniper Exit:** Sell the 50% position if `RSI > 50` (Profit Take) OR hold until Trend Entry confirms (scale up to 100%).
 
 | Strategy | CAGR | Max Drawdown | Final Value (\$10k) |
 | :--- | :--- | :--- | :--- |
@@ -42,17 +43,17 @@ The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by agg
 How the "Hybrid Sniper" manages risk and opportunity:
 
 **1. Trend Mode (The Shield)**
-*   **Condition:** S&P 500 Price > SMA 200 (Risk-On).
+*   **Entry Condition:** `MA10 > SMA200 * 1.02` (10-day MA crosses above the +2% buffer of the 200-day SMA).
 *   **Action:** 100% Allocation to TQQQ.
 *   **Goal:** Capture the bulk of long-term bull markets.
-*   **Exit:** When Price drops below SMA 200.
+*   **Exit Condition:** `MA10 < SMA200 * 0.98` (MA crosses below the -2% buffer).
 
 **2. Sniper Mode (The Spear)**
-*   **Condition:** S&P 500 Price < SMA 200 (Risk-Off) **AND** RSI(14) < 30 (Panic Selling).
+*   **Entry Condition:** In Bear zone (`MA10 < SMA200 * 0.98`) **AND** `RSI(14) < 30` (Panic Selling).
 *   **Action:** 50% Allocation to TQQQ (Starter Position).
-*   **Goal:** Catch "V-Bottom" reversals that the SMA 200 is too slow to identify.
-*   **Exit (Profit Take):** If RSI(14) crosses above 50 (Mean Reversion), sell the position and return to Cash.
-*   **Promotion:** If the market rallies enough to cross the SMA 200, the position scales up to 100% (Trend Mode).
+*   **Goal:** Catch "V-Bottom" reversals that the MA10/SMA200 crossover is too slow to identify.
+*   **Exit (Profit Take):** If `RSI(14) > 50` (Mean Reversion), sell the position and return to Cash.
+*   **Promotion:** If the market rallies enough for `MA10 > SMA200 * 1.02`, the position scales up to 100% (Trend Mode).
 
 **Indicator Details:**
 *   **Indicator:** Relative Strength Index (RSI).
