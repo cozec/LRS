@@ -57,6 +57,15 @@ The user requested testing **Strategy #3**: Solving the "SMA Lag" problem by agg
 | **LRS TQQQ (Baseline)** | 38.50% | -53.23% | \$1,792,759 |
 | **Hybrid Sniper (RSI)** | **43.46%** | **-53.69%** | **\$3,126,043** |
 
+#### Sensitivity: Cash Return Assumption
+
+| Cash Assumption | CAGR | Max Drawdown | Final Value |
+|-----------------|------|--------------|-------------|
+| **3% Cash (T-Bills)** | 42.41% | -57.52% | \$2,027,173 |
+| **0% Cash (Idle)** | 41.69% | -57.54% | \$1,877,263 |
+
+> The 3% cash assumption adds ~0.7% CAGR and ~\$150k over 15 years.
+
 ### Professional Metrics Comparison
 
 | Metric | Direction | Buy & Hold | Baseline | Sniper | Winner |
