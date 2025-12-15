@@ -1,11 +1,49 @@
 import pandas as pd
 import numpy as np
 import os
+from datetime import datetime, time
+import pytz
+import yfinance as yf
 from lrs_hybrid_sniper import calculate_rsi, calculate_signals_sniper, calculate_returns
 
 DATA_DIR = 'data'
 INITIAL_CAPITAL = 10000
 RISK_FREE_RATE = 0.03
+
+def is_market_open():
+    """Check if US stock market is currently open (9:30 AM - 4:00 PM ET, weekdays)."""
+    et_tz = pytz.timezone('America/New_York')
+    now = datetime.now(et_tz)
+    
+    # Check if it's a weekday
+    if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
+        return False
+    
+    # Market hours: 9:30 AM - 4:00 PM ET
+    market_open = time(9, 30)
+    market_close = time(16, 0)
+    current_time = now.time()
+    
+    return market_open <= current_time <= market_close
+
+def fetch_live_prices():
+    """Fetch current SPX and TQQQ prices from Yahoo Finance."""
+    try:
+        spx = yf.Ticker("^GSPC")
+        tqqq = yf.Ticker("TQQQ")
+        
+        spx_price = spx.fast_info.get('lastPrice', None)
+        tqqq_price = tqqq.fast_info.get('lastPrice', None)
+        
+        if spx_price and tqqq_price:
+            return {
+                'spx': spx_price,
+                'tqqq': tqqq_price,
+                'timestamp': datetime.now()
+            }
+    except Exception as e:
+        print(f"Error fetching live prices: {e}")
+    return None
 
 def get_hybrid_sniper_data():
     """
@@ -42,6 +80,30 @@ def get_hybrid_sniper_data():
     upro_returns = upro['Close'].pct_change()
     upro_returns = upro_returns.reindex(df.index)
     df['UPRO_Returns'] = upro_returns
+
+    # === LIVE DATA APPEND (if market is open) ===
+    if is_market_open():
+        live = fetch_live_prices()
+        if live:
+            today = pd.Timestamp.now().normalize()  # Today's date at midnight
+            last_date = df.index[-1]
+            
+            # Only append if today's data doesn't exist yet
+            if today > last_date:
+                # Create a new row with live prices
+                new_row = pd.DataFrame({
+                    'Close': [live['spx']],
+                    'TQQQ_Close': [live['tqqq']],
+                }, index=[today])
+                
+                # Calculate returns from previous close
+                prev_spx = df['Close'].iloc[-1]
+                prev_tqqq = df['TQQQ_Close'].iloc[-1]
+                new_row['TQQQ_Returns'] = (live['tqqq'] - prev_tqqq) / prev_tqqq
+                
+                # Append to dataframe
+                df = pd.concat([df, new_row])
+                print(f"[LIVE] Appended today's data: SPX={live['spx']:.2f}, TQQQ={live['tqqq']:.2f}")
 
     # Calculate Hybrid Sniper Signals
     # This adds: SMA_200, MA_10, RSI, Regime, Signal

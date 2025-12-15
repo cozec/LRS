@@ -11,25 +11,18 @@ from lrs_web_utils import get_hybrid_sniper_data, get_latest_signals
 
 app = Flask(__name__)
 
-# Global cache for data (simple for local host)
-DATA = None
-
-def load_data():
-    global DATA
-    if DATA is None:
-        DATA = get_hybrid_sniper_data()
-    return DATA
-
 @app.route('/')
 def index():
-    df = load_data()
+    # Always fetch fresh data (no caching for live updates)
+    df = get_hybrid_sniper_data()
     status = get_latest_signals(df)
     return render_template('index.html', status=status)
 
 @app.route('/api/data')
 def api_data():
     try:
-        df = load_data()
+        # Always fetch fresh data (no caching for live updates)
+        df = get_hybrid_sniper_data()
         
         # Reset index to get Date column
         data = df.reset_index().copy()
