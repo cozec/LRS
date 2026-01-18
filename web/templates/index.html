@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,32 +8,80 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
+
 <body>
     <header>
         <div>
             <h1>LRS Hybrid Sniper</h1>
             <span class="label">Real-Time Strategy Monitor</span>
         </div>
-        
+
         <div class="status-panel">
             <div class="metric-card {{ status.mode_class }}">
                 <span class="label">Current Mode</span>
                 <span class="value">{{ status.mode }}</span>
             </div>
-            
+
             <div class="metric-card {{ 'bull' if status.price > status.sma_200 else 'bear' }}">
                 <span class="label">SPX Price</span>
                 <span class="value">${{ "{:,.2f}".format(status.price) }}</span>
             </div>
-            
+
             <div class="metric-card">
                 <span class="label">RSI (14)</span>
-                <span class="value" style="color: {{ '#00ff88' if status.rsi < 30 else '#ff3333' if status.rsi > 70 else '#e0e0e0' }}">
+                <span class="value"
+                    style="color: {{ '#00ff88' if status.rsi < 30 else '#ff3333' if status.rsi > 70 else '#e0e0e0' }}">
                     {{ "{:.2f}".format(status.rsi) }}
                 </span>
             </div>
         </div>
     </header>
+
+    <!-- Strategy Logic Summary -->
+    <div class="logic-panel">
+        <div class="logic-box trend">
+            <h3>🛡️ Trend Strategy</h3>
+            <div class="logic-row">
+                <span class="logic-label">Entry</span>
+                <span class="logic-val">MA10 > SMA200 + 2%</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Action</span>
+                <span class="logic-val">100% TQQQ</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Goal</span>
+                <span class="logic-val">Capture Bull Markets</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Exit</span>
+                <span class="logic-val">MA10 < SMA200 - 2%</span>
+            </div>
+        </div>
+        <div class="logic-box sniper">
+            <h3>🗡️ Sniper Strategy (The Spear)</h3>
+            <div class="logic-row">
+                <span class="logic-label">Entry</span>
+                <span class="logic-val">Bear & RSI < 30</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Action</span>
+                <span class="logic-val">50% TQQQ</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Goal</span>
+                <span class="logic-val">Catch V-Bottoms</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Exit</span>
+                <span class="logic-val">RSI > 50 (Cash)</span>
+            </div>
+            <div class="logic-row">
+                <span class="logic-label">Promo</span>
+                <span class="logic-val">To Trend if Recovered</span>
+            </div>
+        </div>
+    </div>
 
     <div id="chart-container">
         <div class="loading">Loading Finance Data...</div>
@@ -40,4 +89,5 @@
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
+
 </html>
