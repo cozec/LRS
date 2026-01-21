@@ -5,9 +5,10 @@ import pandas as pd
 import numpy as np
 import json
 
-# Add project root to sys.path to import lrs_web_utils
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add src to sys.path to import modules
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from lrs_web_utils import get_hybrid_sniper_data, get_latest_signals
+from update_data import update_data
 
 app = Flask(__name__)
 
@@ -47,7 +48,7 @@ def api_data():
         data = data.astype(object).where(pd.notnull(data), None)
         
         # Select columns to convert
-        cols = ['Date', 'Close', 'SMA_200', 'SMA_200_Upper', 'SMA_200_Lower', 'MA_10', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
+        cols = ['Date', 'Open', 'High', 'Low', 'Close', 'SMA_200', 'SMA_200_Upper', 'SMA_200_Lower', 'MA_10', 'RSI', 'Signal', 'Regime', 'TQQQ_Close', 'LRS_Sniper_Value', 'BH_TQQQ_Value']
         
         # Check if columns exist
         missing = [c for c in cols if c not in data.columns]
@@ -97,6 +98,22 @@ def api_data():
             'events': events
         })
         
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/refresh', methods=['POST'])
+def refresh_data():
+    try:
+        # 1. Run Data Download
+        print("Refreshing data via update_data()...")
+        update_data()
+        
+        # 2. Add timestamp or similar to signal cache invalidation if needed
+        # (Since we don't cache explicitly in memory, next request will read new CSVs)
+        
+        return jsonify({'status': 'success', 'message': 'Data updated successfully'})
     except Exception as e:
         import traceback
         traceback.print_exc()

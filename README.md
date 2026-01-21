@@ -2,6 +2,8 @@
 
 This project implements, optimizes, and backtests various "Leverage Rotation Strategies" inspired by Michael A. Gayed's paper "Leverage for the Long Run".
 
+Video reference: https://www.youtube.com/watch?v=cuYIx3ZxNr4&t=1s
+
 ## Key Strategies Implemented
 
 ### 1. Baseline LRS (The Standard)

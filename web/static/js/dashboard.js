@@ -21,14 +21,25 @@ async function fetchData() {
         }
 
         renderChart(data.history, data.events);
+
+        const overlay = document.querySelector('.loading-overlay');
+        if (overlay) overlay.classList.add('hidden');
+
     } catch (error) {
         console.error('Error details:', error);
-        document.querySelector('.loading').innerHTML = `<span style="color: #ff3333; font-family: monospace;">${error.message}</span>`;
+        const overlay = document.querySelector('.loading-overlay');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            overlay.innerHTML = `<span style="color: #ff3333; font-family: monospace;">${error.message}</span>`;
+        }
     }
 }
 
 function renderChart(history, events) {
     const dates = history.map(d => d.Date);
+    const open = history.map(d => d.Open);
+    const high = history.map(d => d.High);
+    const low = history.map(d => d.Low);
     const close = history.map(d => d.Close);
     const sma = history.map(d => d.SMA_200);
     const rsi = history.map(d => d.RSI);
@@ -38,7 +49,7 @@ function renderChart(history, events) {
     const tqqq = history.map(d => d.TQQQ_Close);
     const traceTQQQ = {
         x: dates, y: tqqq, type: 'scatter', mode: 'lines',
-        name: 'TQQQ', line: { color: '#00bcd4', width: 1.2 },
+        name: 'TQQQ', line: { color: '#3399ff', width: 1 }, /* Thinner, refreshed blue */
         xaxis: 'x3', yaxis: 'y3'
     };
 
@@ -52,13 +63,22 @@ function renderChart(history, events) {
         font: { color: '#e0e0e0' },
         showlegend: false,
 
-        // Axis configuration (Price)
-        xaxis: { rangeslider: { visible: false }, showgrid: true, gridcolor: '#333' },
-        yaxis: { domain: [0.60, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
+        // Calculate all missing dates (gaps) to hide them
+        // This handles weekends AND holidays (like Dec 25) automatically
+        // by finding any calendar day not present in the dataset.
+        xaxis: {
+            rangeslider: { visible: false },
+            showgrid: true,
+            gridcolor: '#333',
+            rangebreaks: [
+                { values: getMissingDates(dates) }
+            ]
+        },
+        yaxis: { domain: [0.45, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
 
         // Axis 2 (RSI)
         xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', showticklabels: false },
-        yaxis2: { domain: [0.35, 0.55], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
+        yaxis2: { domain: [0.25, 0.40], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
 
         // Axis 3 (TQQQ)
         xaxis3: {
@@ -79,7 +99,7 @@ function renderChart(history, events) {
                 // Let's put buttons on top axis (x1) for visibility.
             }
         },
-        yaxis3: { domain: [0, 0.30], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
+        yaxis3: { domain: [0, 0.20], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
 
         // Annotations (Flags)
         annotations: events.flatMap(e => {
@@ -100,6 +120,7 @@ function renderChart(history, events) {
     // Move rangeselector back to x1 for top visibility
     layout.xaxis.rangeselector = {
         buttons: [
+            { count: 3, label: '3M', step: 'month', stepmode: 'backward' },
             { count: 6, label: '6M', step: 'month', stepmode: 'backward' },
             { count: 1, label: '1Y', step: 'year', stepmode: 'backward' },
             { count: 5, label: '5Y', step: 'year', stepmode: 'backward' },
@@ -114,16 +135,20 @@ function renderChart(history, events) {
 
     // --- Traces ---
 
-    // 1. Price
+    // 1. Price (Candlestick)
     const tracePrice = {
-        x: dates, y: close, type: 'scatter', mode: 'lines',
-        name: 'SPX', line: { color: '#e0e0e0', width: 1 },
+        x: dates,
+        open: open, high: high, low: low, close: close,
+        type: 'candlestick',
+        name: 'SPX',
+        increasing: { line: { color: '#00ffaa' }, fillcolor: '#00ffaa' }, /* Solid Green */
+        decreasing: { line: { color: '#ff4444' }, fillcolor: '#ff4444' }, /* Solid Red */
         xaxis: 'x', yaxis: 'y'
     };
 
     const traceMA10 = {
         x: dates, y: history.map(d => d.MA_10), type: 'scatter', mode: 'lines',
-        name: 'MA 10', line: { color: '#2979ff', width: 1 },
+        name: 'MA 10', line: { color: '#3399ff', width: 1 }, /* Neon Blue */
         xaxis: 'x', yaxis: 'y'
     };
 
@@ -153,19 +178,19 @@ function renderChart(history, events) {
 
     const traceSMALowerLine = {
         x: dates, y: history.map(d => d.SMA_200_Lower), type: 'scatter', mode: 'lines',
-        name: '-2% Buffer', line: { color: '#ffa500', width: 0.8, dash: 'dot' }, opacity: 0.6,
+        name: '-2% Buffer', line: { color: '#ffaa00', width: 0.5, dash: 'dot' }, opacity: 0.5,
         hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
     const traceSMAUpperLine = {
         x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
-        name: '+2% Buffer', line: { color: '#ffa500', width: 0.8, dash: 'dot' }, opacity: 0.6,
+        name: '+2% Buffer', line: { color: '#ffaa00', width: 0.5, dash: 'dot' }, opacity: 0.5,
         hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
 
     // 2. RSI
     const traceRSI = {
         x: dates, y: rsi, type: 'scatter', mode: 'lines',
-        name: 'RSI(14)', line: { color: '#ba68c8', width: 1 },
+        name: 'RSI(14)', line: { color: '#cc66ff', width: 1 }, /* Lighter purple */
         xaxis: 'x2', yaxis: 'y2'
     };
 
@@ -197,15 +222,21 @@ function renderChart(history, events) {
     const oneYearAgo = new Date(lastDate);
     oneYearAgo.setFullYear(lastDate.getFullYear() - 1);
     const rangeStart = oneYearAgo.toISOString().split('T')[0];
-    const rangeEnd = dates[dates.length - 1];
+
+    // Add padding on the right side (5 days) for better visibility of today's values
+    const rangeEndDate = new Date(lastDate);
+    rangeEndDate.setDate(rangeEndDate.getDate() + 5);
+    const rangeEnd = rangeEndDate.toISOString().split('T')[0];
 
     layout.xaxis.range = [rangeStart, rangeEnd];
 
     const startIdx = dates.findIndex(d => d >= rangeStart);
     if (startIdx !== -1) {
         const visibleClose = close.slice(startIdx);
-        const minPrice = Math.min(...visibleClose);
-        const maxPrice = Math.max(...visibleClose);
+        const visibleSMA = sma.slice(startIdx).filter(v => v != null);
+        const allPriceData = [...visibleClose, ...visibleSMA];
+        const minPrice = Math.min(...allPriceData);
+        const maxPrice = Math.max(...allPriceData);
         const padding = (maxPrice - minPrice) * 0.05;
         layout.yaxis.range = [minPrice - padding, maxPrice + padding];
 
@@ -236,10 +267,12 @@ function renderChart(history, events) {
                 if (endIdx === -1) endIdx = dates.length - 1;
 
                 if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                    // Price
+                    // Price (include SMA200 for proper scaling)
                     const visibleClose = close.slice(startIdx, endIdx);
-                    const minPrice = Math.min(...visibleClose);
-                    const maxPrice = Math.max(...visibleClose);
+                    const visibleSMA = sma.slice(startIdx, endIdx).filter(v => v != null);
+                    const allPriceData = [...visibleClose, ...visibleSMA];
+                    const minPrice = Math.min(...allPriceData);
+                    const maxPrice = Math.max(...allPriceData);
                     const padding = (maxPrice - minPrice) * 0.05;
 
                     // TQQQ
@@ -261,9 +294,6 @@ function renderChart(history, events) {
             }
         });
     });
-
-    // Remove loading spinner
-    document.querySelector('.loading').remove();
 }
 
 function createFlag(event) {
@@ -335,4 +365,35 @@ function createRSIFlag(event) {
         borderpad: 2,
         opacity: 0.8
     };
+}
+
+// Helper to find all calendar dates missing from the dataset
+function getMissingDates(availableDates) {
+    if (!availableDates || availableDates.length === 0) return [];
+
+    const missing = [];
+    // Parse start and end from string to avoid timezone issues (assume YYYY-MM-DD)
+    const startParts = availableDates[0].split('-');
+    const endParts = availableDates[availableDates.length - 1].split('-');
+
+    // Create UTC dates to strictly follow calendar days
+    const current = new Date(Date.UTC(startParts[0], startParts[1] - 1, startParts[2]));
+    const last = new Date(Date.UTC(endParts[0], endParts[1] - 1, endParts[2]));
+
+    const dateSet = new Set(availableDates);
+
+    // Iterate day by day
+    while (current < last) {
+        // Add 1 day
+        current.setUTCDate(current.getUTCDate() + 1);
+        if (current >= last) break;
+
+        // Format back to YYYY-MM-DD
+        const iso = current.toISOString().split('T')[0];
+
+        if (!dateSet.has(iso)) {
+            missing.push(iso);
+        }
+    }
+    return missing;
 }

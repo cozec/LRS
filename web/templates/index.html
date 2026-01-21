@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hybrid Sniper Monitor</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 10000) | random }}">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 
@@ -40,54 +40,42 @@
     <!-- Strategy Logic Summary -->
     <div class="logic-panel">
         <div class="logic-box trend">
-            <h3>🛡️ Trend Strategy</h3>
+            <h3>🛡️ "Trend Strategy"</h3>
             <div class="logic-row">
-                <span class="logic-label">Entry</span>
-                <span class="logic-val">MA10 > SMA200 + 2%</span>
+                <span class="logic-label">Entry:</span>
+                <span class="logic-text">Buy TQQQ if <span class="hl-yellow">(MA10 > SMA200 * 1.02)</span></span>
             </div>
             <div class="logic-row">
-                <span class="logic-label">Action</span>
-                <span class="logic-val">100% TQQQ</span>
-            </div>
-            <div class="logic-row">
-                <span class="logic-label">Goal</span>
-                <span class="logic-val">Capture Bull Markets</span>
-            </div>
-            <div class="logic-row">
-                <span class="logic-label">Exit</span>
-                <span class="logic-val">MA10 < SMA200 - 2%</span>
+                <span class="logic-label">Exit:</span>
+                <span class="logic-text">Sell when <span class="hl-red">MA10 < SMA200 * 0.98</span></span>
             </div>
         </div>
         <div class="logic-box sniper">
-            <h3>🗡️ Sniper Strategy (The Spear)</h3>
+            <h3>🗡️ "Sniper Strategy" (The Spear)</h3>
             <div class="logic-row">
-                <span class="logic-label">Entry</span>
-                <span class="logic-val">Bear & RSI < 30</span>
+                <span class="logic-label">Entry:</span>
+                <span class="logic-text">Buy TQQQ if <span class="hl-yellow">(MA10 < SMA200 * 0.98)</span> AND <span
+                                class="hl-yellow">(RSI < 30)</span></span>
             </div>
             <div class="logic-row">
-                <span class="logic-label">Action</span>
-                <span class="logic-val">50% TQQQ</span>
+                <span class="logic-label">Exit:</span>
+                <span class="logic-text">Sell when <span class="hl-red">RSI > 50</span></span>
             </div>
             <div class="logic-row">
-                <span class="logic-label">Goal</span>
-                <span class="logic-val">Catch V-Bottoms</span>
-            </div>
-            <div class="logic-row">
-                <span class="logic-label">Exit</span>
-                <span class="logic-val">RSI > 50 (Cash)</span>
-            </div>
-            <div class="logic-row">
-                <span class="logic-label">Promo</span>
-                <span class="logic-val">To Trend if Recovered</span>
+                <span class="logic-label">Promo:</span>
+                <span class="logic-text">Promote to <span class="hl-green">Trend Mode</span> if market recovers</span>
             </div>
         </div>
     </div>
 
     <div id="chart-container">
-        <div class="loading">Loading Finance Data...</div>
+        <div class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading Finance Data...</div>
+        </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v={{ range(1, 10000) | random }}"></script>
 </body>
 
 </html>
