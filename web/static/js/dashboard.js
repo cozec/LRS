@@ -58,6 +58,7 @@ function renderChart(history, events) {
         grid: { rows: 3, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
         autosize: true,
         height: window.innerHeight - 50,
+        margin: { t: 10, b: 40, l: 50, r: 80 },
         paper_bgcolor: '#1a1a1a',
         plot_bgcolor: '#1a1a1a',
         font: { color: '#e0e0e0' },
@@ -72,19 +73,10 @@ function renderChart(history, events) {
             gridcolor: '#333',
             rangebreaks: [
                 { values: getMissingDates(dates) }
-            ]
-        },
-        yaxis: { domain: [0.45, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
-
-        // Axis 2 (RSI)
-        xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', showticklabels: false },
-        yaxis2: { domain: [0.25, 0.40], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
-
-        // Axis 3 (TQQQ)
-        xaxis3: {
-            showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date',
+            ],
             rangeselector: {
                 buttons: [
+                    { count: 3, label: '3M', step: 'month', stepmode: 'backward' },
                     { count: 6, label: '6M', step: 'month', stepmode: 'backward' },
                     { count: 1, label: '1Y', step: 'year', stepmode: 'backward' },
                     { count: 5, label: '5Y', step: 'year', stepmode: 'backward' },
@@ -93,13 +85,22 @@ function renderChart(history, events) {
                 font: { color: '#e0e0e0', size: 11 },
                 bgcolor: '#333',
                 activecolor: '#555',
-                y: 1.2 // Move buttons above bottom chart or keep top? 
-                // Let's keep buttons on top chart but range linked? 
-                // Actually Plotly buttons usually go on the specific axis. 
-                // Let's put buttons on top axis (x1) for visibility.
+                y: 0.40,
+                yanchor: 'bottom'
             }
         },
-        yaxis3: { domain: [0, 0.20], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
+        yaxis: { domain: [0.40, 1], showgrid: true, gridcolor: '#333', title: 'S&P 500' },
+
+        // Axis 2 (RSI) - Smaller
+        xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', showticklabels: false },
+        yaxis2: { domain: [0.25, 0.38], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
+
+        // Axis 3 (TQQQ) - Smaller
+        // Axis 3 (TQQQ) - Smaller
+        xaxis3: {
+            showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date'
+        },
+        yaxis3: { domain: [0, 0.23], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
 
         // Annotations (Flags)
         annotations: events.flatMap(e => {
@@ -117,22 +118,6 @@ function renderChart(history, events) {
 
     // ... rest of layout ...
 
-    // Move rangeselector back to x1 for top visibility
-    layout.xaxis.rangeselector = {
-        buttons: [
-            { count: 3, label: '3M', step: 'month', stepmode: 'backward' },
-            { count: 6, label: '6M', step: 'month', stepmode: 'backward' },
-            { count: 1, label: '1Y', step: 'year', stepmode: 'backward' },
-            { count: 5, label: '5Y', step: 'year', stepmode: 'backward' },
-            { step: 'all', label: 'All' }
-        ],
-        font: { color: '#e0e0e0', size: 11 },
-        bgcolor: '#333',
-        activecolor: '#555',
-        x: 0, y: 1.05
-    };
-    delete layout.xaxis3.rangeselector;
-
     // --- Traces ---
 
     // 1. Price (Candlestick)
@@ -141,20 +126,20 @@ function renderChart(history, events) {
         open: open, high: high, low: low, close: close,
         type: 'candlestick',
         name: 'SPX',
-        increasing: { line: { color: '#00ffaa' }, fillcolor: '#00ffaa' }, /* Solid Green */
-        decreasing: { line: { color: '#ff4444' }, fillcolor: '#ff4444' }, /* Solid Red */
+        increasing: { line: { color: '#26a69a' }, fillcolor: '#26a69a' }, /* Teal Green */
+        decreasing: { line: { color: '#ef5350' }, fillcolor: '#ef5350' }, /* Red */
         xaxis: 'x', yaxis: 'y'
     };
 
     const traceMA10 = {
         x: dates, y: history.map(d => d.MA_10), type: 'scatter', mode: 'lines',
-        name: 'MA 10', line: { color: '#3399ff', width: 1 }, /* Neon Blue */
+        name: 'MA 10', line: { color: '#ff6b6b', width: 1.5 }, /* Red/Pink */
         xaxis: 'x', yaxis: 'y'
     };
 
     const traceSMA = {
         x: dates, y: sma, type: 'scatter', mode: 'lines',
-        name: 'SMA 200', line: { color: '#ffa500', width: 1, dash: 'dash' },
+        name: 'SMA 200', line: { color: '#4fc3f7', width: 1.5 }, /* Light Blue/Cyan */
         xaxis: 'x', yaxis: 'y'
     };
 
@@ -217,11 +202,11 @@ function renderChart(history, events) {
     // Auto-Calculate Initial Y-Axis for 1 Year (Price)
     // Also TQQQ if we want, but Price is main
 
-    // --- Default Range: 1 Year ---
+    // --- Default Range: 6 Months ---
     const lastDate = new Date(dates[dates.length - 1]);
-    const oneYearAgo = new Date(lastDate);
-    oneYearAgo.setFullYear(lastDate.getFullYear() - 1);
-    const rangeStart = oneYearAgo.toISOString().split('T')[0];
+    const sixMonthsAgo = new Date(lastDate);
+    sixMonthsAgo.setMonth(lastDate.getMonth() - 6);
+    const rangeStart = sixMonthsAgo.toISOString().split('T')[0];
 
     // Add padding on the right side (5 days) for better visibility of today's values
     const rangeEndDate = new Date(lastDate);
@@ -253,6 +238,49 @@ function renderChart(history, events) {
         const maxRSI = Math.max(...visibleRSI);
         layout.yaxis2.range = [Math.max(0, minRSI - 5), Math.min(100, maxRSI + 5)];
     }
+
+    // Get latest values for right-side annotations
+    const latestClose = close[close.length - 1];
+    const latestMA10 = history[history.length - 1].MA_10;
+    const latestSMA200 = sma[sma.length - 1];
+
+    // Add right-side price annotations (no horizontal lines)
+    layout.annotations = layout.annotations || [];
+    layout.annotations.push(
+        // Current Price label (green background, white text)
+        {
+            x: 1.01, y: latestClose,
+            xref: 'paper', yref: 'y',
+            text: `<b>${latestClose.toFixed(2)}</b>`,
+            showarrow: false,
+            font: { color: '#fff', size: 12 },
+            bgcolor: '#26a69a',
+            borderpad: 4,
+            xanchor: 'left'
+        },
+        // MA10 label (pink/red background, white text)
+        {
+            x: 1.01, y: latestMA10,
+            xref: 'paper', yref: 'y',
+            text: `<b>${latestMA10.toFixed(2)}</b>`,
+            showarrow: false,
+            font: { color: '#fff', size: 11 },
+            bgcolor: '#ff6b6b',
+            borderpad: 3,
+            xanchor: 'left'
+        },
+        // SMA200 label (blue background, black text)
+        {
+            x: 1.01, y: latestSMA200,
+            xref: 'paper', yref: 'y',
+            text: `<b>${latestSMA200.toFixed(2)}</b>`,
+            showarrow: false,
+            font: { color: '#000', size: 11 },
+            bgcolor: '#4fc3f7',
+            borderpad: 3,
+            xanchor: 'left'
+        }
+    );
 
     Plotly.newPlot('chart-container', data, layout, { responsive: true, scrollZoom: true }).then(gd => {
         gd.on('plotly_relayout', event => {

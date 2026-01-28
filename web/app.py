@@ -8,22 +8,21 @@ import json
 # Add src to sys.path to import modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from lrs_web_utils import get_hybrid_sniper_data, get_latest_signals
-from update_data import update_data
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    # Always fetch fresh data (no caching for live updates)
-    df = get_hybrid_sniper_data()
+    # Always fetch fresh data from yfinance on page load
+    df = get_hybrid_sniper_data(force_refresh=True)
     status = get_latest_signals(df)
     return render_template('index.html', status=status)
 
 @app.route('/api/data')
 def api_data():
     try:
-        # Always fetch fresh data (no caching for live updates)
-        df = get_hybrid_sniper_data()
+        # Read from CSV (data was just refreshed by page load)
+        df = get_hybrid_sniper_data(force_refresh=False)
         
         # Reset index to get Date column
         data = df.reset_index().copy()
@@ -106,14 +105,12 @@ def api_data():
 @app.route('/api/refresh', methods=['POST'])
 def refresh_data():
     try:
-        # 1. Run Data Download
-        print("Refreshing data via update_data()...")
-        update_data()
+        # Download fresh data from yfinance and recalculate indicators
+        print("[REFRESH] Downloading fresh data from yfinance...")
+        df = get_hybrid_sniper_data(force_refresh=True)
+        print(f"[REFRESH] Complete. Last date: {df.index[-1]}")
         
-        # 2. Add timestamp or similar to signal cache invalidation if needed
-        # (Since we don't cache explicitly in memory, next request will read new CSVs)
-        
-        return jsonify({'status': 'success', 'message': 'Data updated successfully'})
+        return jsonify({'status': 'success', 'message': f'Data refreshed. Last date: {df.index[-1].strftime("%Y-%m-%d")}'})
     except Exception as e:
         import traceback
         traceback.print_exc()
