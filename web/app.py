@@ -80,7 +80,13 @@ def api_data():
                 elif state == 1.0: 
                     event_type = "TREND SIGNAL"
                 elif state == 0.0:
-                    event_type = "EXIT SIGNAL"
+                    prev_state = df['Regime'].iloc[df.index.get_loc(date) - 1] if df.index.get_loc(date) > 0 else 0.0
+                    if prev_state == 0.5:
+                        event_type = "SNIPER EXIT"
+                    elif prev_state == 1.0:
+                        event_type = "TREND EXIT"
+                    else:
+                        event_type = "EXIT SIGNAL"
                 elif change < 0 and state == 0.5: # 1.0 -> 0.5
                     event_type = "REDUCE SIGNAL"
                     

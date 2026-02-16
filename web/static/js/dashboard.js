@@ -57,8 +57,8 @@ function renderChart(history, events) {
     const layout = {
         grid: { rows: 3, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
         autosize: true,
-        height: window.innerHeight - 50,
-        margin: { t: 10, b: 40, l: 50, r: 80 },
+        height: document.getElementById('chart-container').clientHeight,
+        margin: { t: 5, b: 40, l: 50, r: 80 },
         paper_bgcolor: '#1a1a1a',
         plot_bgcolor: '#1a1a1a',
         font: { color: '#e0e0e0' },
@@ -93,14 +93,14 @@ function renderChart(history, events) {
 
         // Axis 2 (RSI) - Smaller
         xaxis2: { showgrid: true, gridcolor: '#333', matches: 'x', showticklabels: false },
-        yaxis2: { domain: [0.25, 0.38], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
+        yaxis2: { domain: [0.21, 0.39], showgrid: true, gridcolor: '#333', title: 'RSI', range: [0, 100] },
 
         // Axis 3 (TQQQ) - Smaller
         // Axis 3 (TQQQ) - Smaller
         xaxis3: {
             showgrid: true, gridcolor: '#333', matches: 'x', title: 'Date'
         },
-        yaxis3: { domain: [0, 0.23], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
+        yaxis3: { domain: [0, 0.20], type: 'log', showgrid: true, gridcolor: '#333', title: 'TQQQ ($)' },
 
         // Annotations (Flags)
         annotations: events.flatMap(e => {
@@ -133,7 +133,7 @@ function renderChart(history, events) {
 
     const traceMA10 = {
         x: dates, y: history.map(d => d.MA_10), type: 'scatter', mode: 'lines',
-        name: 'MA 10', line: { color: '#ff6b6b', width: 1.5 }, /* Red/Pink */
+        name: 'MA 10', line: { color: '#007bff', width: 1.5 }, /* Blue */
         xaxis: 'x', yaxis: 'y'
     };
 
@@ -146,14 +146,14 @@ function renderChart(history, events) {
     // Buffer Magic (Hysteresis Zone)
     const traceSMALower = {
         x: dates, y: history.map(d => d.SMA_200_Lower), type: 'scatter', mode: 'lines',
-        name: '-2% Buffer', line: { color: '#ffa500', width: 0, dash: 'dot' },
+        name: '-2% Buffer', line: { color: '#ffcc00', width: 0, dash: 'dot' },
         showlegend: false, hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
 
     const traceSMAUpper = {
         x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
-        name: 'Buffer Zone', line: { color: '#ffa500', width: 0, dash: 'dot' },
-        fill: 'tonexty', fillcolor: 'rgba(255, 165, 0, 0.1)', // Faint Orange Fill
+        name: 'Buffer Zone', line: { color: '#ffcc00', width: 0, dash: 'dot' },
+        fill: 'tonexty', fillcolor: 'rgba(255, 204, 0, 0.15)', // Brighter Gold Fill
         hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
 
@@ -163,12 +163,12 @@ function renderChart(history, events) {
 
     const traceSMALowerLine = {
         x: dates, y: history.map(d => d.SMA_200_Lower), type: 'scatter', mode: 'lines',
-        name: '-2% Buffer', line: { color: '#ffaa00', width: 0.5, dash: 'dot' }, opacity: 0.5,
+        name: '-2% Buffer', line: { color: '#ffcc00', width: 0.8, dash: 'dot' }, opacity: 0.7,
         hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
     const traceSMAUpperLine = {
         x: dates, y: history.map(d => d.SMA_200_Upper), type: 'scatter', mode: 'lines',
-        name: '+2% Buffer', line: { color: '#ffaa00', width: 0.5, dash: 'dot' }, opacity: 0.5,
+        name: '+2% Buffer', line: { color: '#ffcc00', width: 0.8, dash: 'dot' }, opacity: 0.7,
         hoverinfo: 'none', xaxis: 'x', yaxis: 'y'
     };
 
@@ -242,7 +242,7 @@ function renderChart(history, events) {
     // Get latest values for right-side annotations
     const latestClose = close[close.length - 1];
     const latestMA10 = history[history.length - 1].MA_10;
-    const latestSMA200 = sma[sma.length - 1];
+    const latestMA200 = sma[sma.length - 1];
 
     // Add right-side price annotations (no horizontal lines)
     layout.annotations = layout.annotations || [];
@@ -258,22 +258,22 @@ function renderChart(history, events) {
             borderpad: 4,
             xanchor: 'left'
         },
-        // MA10 label (pink/red background, white text)
+        // MA10 label (blue background, white text)
         {
             x: 1.01, y: latestMA10,
             xref: 'paper', yref: 'y',
             text: `<b>${latestMA10.toFixed(2)}</b>`,
             showarrow: false,
             font: { color: '#fff', size: 11 },
-            bgcolor: '#ff6b6b',
+            bgcolor: '#007bff',
             borderpad: 3,
             xanchor: 'left'
         },
-        // SMA200 label (blue background, black text)
+        // MA200 label (blue background, black text)
         {
-            x: 1.01, y: latestSMA200,
+            x: 1.01, y: latestMA200,
             xref: 'paper', yref: 'y',
-            text: `<b>${latestSMA200.toFixed(2)}</b>`,
+            text: `<b>${latestMA200.toFixed(2)}</b>`,
             showarrow: false,
             font: { color: '#000', size: 11 },
             bgcolor: '#4fc3f7',
@@ -295,7 +295,7 @@ function renderChart(history, events) {
                 if (endIdx === -1) endIdx = dates.length - 1;
 
                 if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                    // Price (include SMA200 for proper scaling)
+                    // Price (include MA200 for proper scaling)
                     const visibleClose = close.slice(startIdx, endIdx);
                     const visibleSMA = sma.slice(startIdx, endIdx).filter(v => v != null);
                     const allPriceData = [...visibleClose, ...visibleSMA];
@@ -327,17 +327,21 @@ function renderChart(history, events) {
 function createFlag(event) {
     let color = '#888';
     let text = event.type;
-    let ay = -40; // Default (Above)
+    let ay = -40;
+    let ax = 25;
 
-    if (event.type.includes('TREND')) {
+    if (event.type.includes('EXIT')) {
+        color = '#ff5252';
+        ay = -60;
+        ax = 30;
+    } else if (event.type.includes('TREND')) {
         color = '#00ff00';
-        ay = 60; // Below, pointing Up
+        ay = 60;
+        ax = -30;
     } else if (event.type.includes('SNIPER')) {
         color = '#00ff88';
-        ay = 40; // Below, pointing Up
-    } else if (event.type.includes('EXIT')) {
-        color = '#ff3333';
-        ay = -40; // Only Exits stay above (pointing Down)
+        ay = 50;
+        ax = -25;
     }
 
     return {
@@ -345,18 +349,20 @@ function createFlag(event) {
         y: event.price,
         xref: 'x',
         yref: 'y',
-        text: text,
+        text: `<b>${text}</b>`,
         showarrow: true,
         arrowhead: 2,
-        ax: 0,
+        arrowsize: 1.2,
+        standoff: 8,
+        ax: ax,
         ay: ay,
         arrowcolor: color,
-        font: { color: color, size: 10 },
-        bgcolor: '#1a1a1a',
+        font: { color: event.type.includes('EXIT') ? '#fff' : color, size: 10 },
+        bgcolor: event.type.includes('EXIT') ? '#ff5252' : '#1a1a1a',
         bordercolor: color,
         borderwidth: 1,
-        borderpad: 2,
-        opacity: 0.8
+        borderpad: 3,
+        opacity: 0.9
     };
 }
 
@@ -364,15 +370,18 @@ function createRSIFlag(event) {
     let color = '#888';
     let text = 'RSI';
     let ay = -30; // Default Above
+    let ax = 15;  // Default horizontal offset
 
-    if (event.type.includes('SNIPER')) {
+    if (event.type.includes('EXIT')) {
+        color = '#ff5252';
+        text = event.type;
+        ay = -60; // Further Above
+        ax = 25;  // Offset right
+    } else if (event.type.includes('SNIPER')) {
         color = '#00ff88';
         text = 'SNIPE';
-        ay = 30; // Below, pointing Up
-    } else if (event.type.includes('EXIT')) {
-        color = '#ff3333';
-        text = 'EXIT';
-        ay = -30; // Above, pointing Down
+        ay = 60; // Further Below
+        ax = -20; // Offset left
     }
 
     return {
@@ -380,18 +389,18 @@ function createRSIFlag(event) {
         y: event.rsi, // Use RSI value
         xref: 'x', // Shared X axis
         yref: 'y2', // RSI Axis
-        text: text,
+        text: `<b>${text}</b>`,
         showarrow: true,
         arrowhead: 2,
-        ax: 0,
+        ax: ax,
         ay: ay,
         arrowcolor: color,
-        font: { color: color, size: 9 },
-        bgcolor: '#1a1a1a',
+        font: { color: event.type.includes('EXIT') ? '#fff' : color, size: 9 },
+        bgcolor: event.type.includes('EXIT') ? '#ff5252' : '#1a1a1a',
         bordercolor: color,
         borderwidth: 1,
-        borderpad: 2,
-        opacity: 0.8
+        borderpad: 3,
+        opacity: 0.9
     };
 }
 
