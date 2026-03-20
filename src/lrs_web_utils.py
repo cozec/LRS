@@ -24,16 +24,19 @@ def download_fresh_data():
     sp500 = yf.download('^GSPC', start='2000-01-01', progress=False, auto_adjust=False)
     if isinstance(sp500.columns, pd.MultiIndex):
         sp500.columns = sp500.columns.get_level_values(0)
+    sp500 = sp500.ffill().bfill()
     
     # Download TQQQ
     tqqq = yf.download('TQQQ', start='2010-02-09', progress=False, auto_adjust=False)
     if isinstance(tqqq.columns, pd.MultiIndex):
         tqqq.columns = tqqq.columns.get_level_values(0)
+    tqqq = tqqq.ffill().bfill()
     
     # Download VIX
     vix = yf.download('^VIX', start='2000-01-01', progress=False, auto_adjust=False)
     if isinstance(vix.columns, pd.MultiIndex):
         vix.columns = vix.columns.get_level_values(0)
+    vix = vix.ffill().bfill()
     
     print(f"[REFRESH] SP500 last date: {sp500.index[-1]}, TQQQ last date: {tqqq.index[-1]}")
     
@@ -123,6 +126,7 @@ def get_latest_signals(df):
         'price': last_row['Close'],
         'tqqq_price': last_row['TQQQ_Close'],
         'sma_200': last_row['SMA_200'],
+        'ma_10': last_row['MA_10'],
         'rsi': last_row['RSI'],
         'vix': vix_value,
         'signal_alloc': last_row['Signal'],

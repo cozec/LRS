@@ -11,6 +11,14 @@ from lrs_web_utils import get_hybrid_sniper_data, get_latest_signals
 
 app = Flask(__name__)
 
+@app.after_request
+def add_header(r):
+    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    r.headers["Expires"] = "0"
+    r.headers['Cache-Control'] = 'public, max-age=0'
+    return r
+
 @app.route('/')
 def index():
     # Always fetch fresh data from yfinance on page load

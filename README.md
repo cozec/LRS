@@ -39,6 +39,55 @@ Video reference: https://www.youtube.com/watch?v=cuYIx3ZxNr4&t=1s
 
 ## Usage
 
+### Live Monitoring and Alerts
+
+The project includes an automated monitoring system for the 'Hybrid Sniper' strategy. It runs hourly during market hours and sends email alerts for signal changes.
+
+### Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment:**
+   Copy `.env.example` to `.env` and fill in your SMTP details:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Run the monitor:**
+   ```bash
+   python src/monitor_hybrid_sniper.py
+   ```
+
+### Background Service (macOS)
+
+The monitor can be set up to run automatically in the background on login.
+
+- **Start/Load Service:**
+  ```bash
+  launchctl load ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
+  ```
+- **Stop/Unload Service:**
+  ```bash
+  launchctl unload ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
+  ```
+- **Check Status:**
+  ```bash
+  launchctl list | grep hybrid_sniper
+  ```
+- **View Logs:**
+  ```bash
+  tail -f logs/monitor.log
+  ```
+
+### Command Line Options
+
+- `--dry-run`: Run the monitor without sending emails.
+- `--test-email`: Send a test email to verify configuration.
+- `--once`: Run a single check and exit.
+
 ### 1. Run the Winning Strategy
 This generates trade plots in `plots/trades_comparison.pdf` and `plots/custom_plot_covid.pdf`.
 ```bash
