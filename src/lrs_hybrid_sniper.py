@@ -314,35 +314,42 @@ def plot_trades(df, transactions):
             trade_type = trade.get('Type', 'Unknown')
             entry_reason = "SMA Trend" if "SMA" in trade_type else "RSI Panic"
             
-            # Exit Reason Logic:
-            # Check the Signal/Allocation on the EXIT DATE (Last day held)
-            # If Signal was 1.0 -> We exited from Trend -> SMA Breakdown
-            # If Signal was 0.5 -> We exited from Sniper -> RSI Profit
-            exit_sig = subset.loc[subset.index == exit_date, 'Signal']
-            if not exit_sig.empty:
-                last_alloc = exit_sig.iloc[0]
-                exit_reason = "SMA Break" if last_alloc == 1.0 else "RSI Target"
+            # Check if this trade is still open
+            is_open = trade.get('Status', 'CLOSED') == 'OPEN'
+            
+            # Exit Reason Logic
+            if is_open:
+                exit_reason = "STILL OPEN"
             else:
-                exit_reason = "Exit"
+                # Check the Signal/Allocation on the EXIT DATE
+                exit_sig = subset.loc[subset.index == exit_date, 'Signal']
+                if not exit_sig.empty:
+                    last_alloc = exit_sig.iloc[0]
+                    exit_reason = "SMA Break" if last_alloc == 1.0 else "RSI Target"
+                else:
+                    exit_reason = "Exit"
 
             # Mark Entry
             spx_entry = subset.loc[subset.index >= entry_date, 'Close'].iloc[0] if not subset.loc[subset.index >= entry_date].empty else None
             if spx_entry: 
                 ax1.scatter(entry_date, spx_entry, color='green', marker='^', s=60, zorder=5)
-                # Arrow pointing DOWN to the Entry point (from above)
                 ax1.annotate('', xy=(entry_date, spx_entry), xytext=(0, 20), 
                              textcoords='offset points', arrowprops=dict(arrowstyle='->', color='green', lw=1.0))
 
             # Mark Exit
             spx_exit = subset.loc[subset.index >= exit_date, 'Close'].iloc[0] if not subset.loc[subset.index >= exit_date].empty else None
-            if spx_exit: 
-                ax1.scatter(exit_date, spx_exit, color='red', marker='v', s=60, zorder=5)
-                # Arrow pointing DOWN to the Exit point (from above)
+            if spx_exit:
+                exit_color = '#ff8c00' if is_open else 'red'
+                exit_marker = 'D' if is_open else 'v'
+                ax1.scatter(exit_date, spx_exit, color=exit_color, marker=exit_marker, s=60, zorder=5)
                 ax1.annotate('', xy=(exit_date, spx_exit), xytext=(0, 20), 
-                             textcoords='offset points', arrowprops=dict(arrowstyle='->', color='red', lw=1.0))
+                             textcoords='offset points', arrowprops=dict(arrowstyle='->', color=exit_color, lw=1.0))
             
             trade_type = trade.get('Type', 'Unknown')
-            title_text = f"Trade #{idx} ({trade_type}) | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days)"
+            if is_open:
+                title_text = f"Trade #{idx} ({trade_type} - Still Open) | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days)"
+            else:
+                title_text = f"Trade #{idx} ({trade_type}) | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days)"
             ax1.set_title(title_text, fontsize=10, fontweight='bold')
             ax1.set_ylabel('S&P 500', fontsize=8)
             ax1.legend(loc='upper left', fontsize='x-small')
@@ -497,7 +504,12 @@ def plot_custom_range(df, start_date, end_date, output_filename='custom_plot_cov
 
 
 def generate_transaction_log(df):
-    """Generate a detailed list of all trades (Sniper & Trend)."""
+    """Generate a detailed list of all trades (Sniper & Trend).
+
+    Each trade includes a 'Status' field:
+    - 'CLOSED': Trade exited by a real signal (SMA breakdown or RSI profit-take).
+    - 'OPEN': Trade is still active at the end of available data.
+    """
     df = df.dropna(subset=['Signal'])
     
     trades = []
@@ -510,36 +522,33 @@ def generate_transaction_log(df):
         signal = df['Signal'].iloc[i]
         
         # Start of Trade (Signal > 0)
+        # Signal is already Regime.shift(1), so day i is the execution day
         if signal > 0 and not in_trade:
             in_trade = True
-            entry_idx = i - 1 if i > 0 else 0
-            entry_date = df.index[entry_idx]
+            entry_date = df.index[i]
             trade_start_idx = i
             
-            # Determine Type
-            # Look at RSI at entry
-            rsi_entry = df['RSI'].iloc[entry_idx]
-            sma_entry = df['SMA_200'].iloc[entry_idx]
-            close_entry = df['Close'].iloc[entry_idx]
+            # Determine Type: look at the signal generation day's conditions (i-1)
+            sig_idx = i - 1 if i > 0 else 0
+            rsi_entry = df['RSI'].iloc[sig_idx]
+            sma_entry = df['SMA_200'].iloc[sig_idx]
+            close_entry = df['Close'].iloc[sig_idx]
             
-            if close_entry < sma_entry and rsi_entry < 35: # Close enough to 30
+            if close_entry < sma_entry and rsi_entry < 35:  # Close enough to 30
                 entry_type = "Sniper (RSI)"
             else:
                 entry_type = "Trend (SMA)"
             
-        # End of Trade (Signal == 0 or End of Data)
-        elif in_trade and (signal == 0 or i == len(df) - 1):
+        # End of Trade: Real exit (Signal == 0)
+        elif in_trade and signal == 0:
             in_trade = False
-            exit_idx = i - 1
-            exit_date = df.index[exit_idx]
+            exit_date = df.index[i]
             
-            # Calculate returns
-            # Use the actual Strategy Return column which accounts for 0.5 vs 1.0 allocation
-            strat_period = df['LRS_Sniper_Return'].iloc[trade_start_idx : exit_idx + 1]
+            # Calculate returns (include the exit day)
+            strat_period = df['LRS_Sniper_Return'].iloc[trade_start_idx:i + 1]
             strat_ret = (1 + strat_period).prod() - 1
             
-            # Pure TQQQ return for reference
-            tqqq_period = df['TQQQ_Returns'].iloc[trade_start_idx : exit_idx + 1]
+            tqqq_period = df['TQQQ_Returns'].iloc[trade_start_idx:i + 1]
             tqqq_ret = (1 + tqqq_period).prod() - 1
             
             trades.append({
@@ -547,9 +556,30 @@ def generate_transaction_log(df):
                 'Exit_Date': exit_date,
                 'Duration_Days': (exit_date - entry_date).days,
                 'Type': entry_type,
+                'Status': 'CLOSED',
                 'Return_Strategy': strat_ret,
                 'Return_TQQQ': tqqq_ret,
             })
+    
+    # Open trade at end (still active, NOT a real exit)
+    if in_trade:
+        exit_date = df.index[-1]
+        
+        strat_period = df['LRS_Sniper_Return'].iloc[trade_start_idx:]
+        strat_ret = (1 + strat_period).prod() - 1
+        
+        tqqq_period = df['TQQQ_Returns'].iloc[trade_start_idx:]
+        tqqq_ret = (1 + tqqq_period).prod() - 1
+        
+        trades.append({
+            'Entry_Date': entry_date,
+            'Exit_Date': exit_date,
+            'Duration_Days': (exit_date - entry_date).days,
+            'Type': entry_type,
+            'Status': 'OPEN',
+            'Return_Strategy': strat_ret,
+            'Return_TQQQ': tqqq_ret,
+        })
     
     trades_df = pd.DataFrame(trades)
     return trades_df
@@ -693,23 +723,22 @@ def run_comparison(start_date='2010-01-01'):
     return df, metrics
 
 def calculate_rsi(series, period=14):
-    """Calculate RSI."""
+    """Calculate RSI using Wilder's Smoothing (Exponential Weighted Moving Average).
+
+    Parameters:
+        series (pd.Series): The price series.
+        period (int): The RSI lookback period.
+
+    Returns:
+        pd.Series: The calculated RSI series.
+    """
     delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
-    
-    # Smooth RSI (Wilder's Smoothing) - simpler for now to use SMA or EMA? 
-    # Standard RSI uses Wilder's which is an EMA.
-    # Let's use pandas ewm for better accuracy
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
-    
+
     avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
     avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
-    
+
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return rsi

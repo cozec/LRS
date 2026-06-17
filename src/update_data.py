@@ -57,5 +57,17 @@ def update_data():
     vix.to_csv(os.path.join(DATA_DIR, 'vix.csv'))
     print(f"Saved vix.csv. Last date: {vix.index[-1]}")
 
+    # 6. SOXL
+    print(f"Downloading SOXL from 2010-03-11 to {end_date}...")
+    soxl = yf.download('SOXL', start='2010-03-11', end=end_date, auto_adjust=False, multi_level_index=False)
+    if isinstance(soxl.columns, pd.MultiIndex):
+        soxl.columns = soxl.columns.get_level_values(0)
+    # Keep only target columns
+    soxl = soxl[['Open', 'High', 'Low', 'Close', 'Volume']]
+    soxl.index.name = 'Date'
+    soxl.to_csv(os.path.join(DATA_DIR, 'soxl.csv'))
+    print(f"Saved soxl.csv. Last date: {soxl.index[-1]}")
+
 if __name__ == "__main__":
     update_data()
+

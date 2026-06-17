@@ -106,9 +106,19 @@ def api_data():
                     'signal_new': state
                 })
         
+        # Get refresh time from data file modification
+        from datetime import datetime
+        data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data'))
+        sp500_path = os.path.join(data_dir, 'sp500.csv')
+        refresh_time = None
+        if os.path.exists(sp500_path):
+            mtime = os.path.getmtime(sp500_path)
+            refresh_time = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+
         return jsonify({
             'history': result,
-            'events': events
+            'events': events,
+            'refresh_time': refresh_time
         })
         
     except Exception as e:

@@ -120,6 +120,13 @@ def get_latest_signals(df):
         vix_df = pd.read_csv(vix_path, index_col=0, parse_dates=True)
         if not vix_df.empty:
             vix_value = vix_df['Close'].iloc[-1]
+            
+    # Find the modification time of sp500.csv to get the last refresh time
+    sp500_path = os.path.join(DATA_DIR, 'sp500.csv')
+    refresh_time = None
+    if os.path.exists(sp500_path):
+        mtime = os.path.getmtime(sp500_path)
+        refresh_time = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
     
     status = {
         'date': df.index[-1].strftime('%Y-%m-%d'),
@@ -132,7 +139,8 @@ def get_latest_signals(df):
         'signal_alloc': last_row['Signal'],
         'regime': last_row['Regime'],
         'trend_signal': "BULL" if last_row['Close'] > last_row['SMA_200'] else "BEAR",
-        'sniper_signal': "OVERSOLD" if last_row['RSI'] < 30 else "NEUTRAL"
+        'sniper_signal': "OVERSOLD" if last_row['RSI'] < 30 else "NEUTRAL",
+        'refresh_time': refresh_time
     }
     
     # Determine Mode Text

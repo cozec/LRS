@@ -22,6 +22,14 @@ async function fetchData() {
 
         renderChart(data.history, data.events);
 
+        // Update refresh time in UI
+        if (data.refresh_time) {
+            const refreshEl = document.querySelector('.refresh-time');
+            if (refreshEl) {
+                refreshEl.textContent = data.refresh_time;
+            }
+        }
+
         const overlay = document.querySelector('.loading-overlay');
         if (overlay) overlay.classList.add('hidden');
 

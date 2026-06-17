@@ -34,6 +34,7 @@ Video reference: https://www.youtube.com/watch?v=cuYIx3ZxNr4&t=1s
 ## Project Structure
 *   `lrs_backtest.py`: Standard Baseline backtest.
 *   `lrs_hybrid_sniper.py`: **Main Script.** Runs the Hybrid Sniper strategy backtest and generates detailed trade plots.
+*   `lrs_soxl_backtest.py`: Runs the SOXL backtest suite (Buy & Hold, Baseline, Hybrid Sniper).
 *   `generate_final_report.py`: Generates a high-level PDF Executive Summary.
 *   `summary.md`: Detailed research notes, trade logs, and analysis.
 
@@ -66,21 +67,21 @@ The project includes an automated monitoring system for the 'Hybrid Sniper' stra
 The monitor can be set up to run automatically in the background on login.
 
 - **Start/Load Service:**
-  ```bash
-  launchctl load ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
-  ```
+   ```bash
+   launchctl load ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
+   ```
 - **Stop/Unload Service:**
-  ```bash
-  launchctl unload ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
-  ```
+   ```bash
+   launchctl unload ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
+   ```
 - **Check Status:**
-  ```bash
-  launchctl list | grep hybrid_sniper
-  ```
+   ```bash
+   launchctl list | grep hybrid_sniper
+   ```
 - **View Logs:**
-  ```bash
-  tail -f logs/monitor.log
-  ```
+   ```bash
+   tail -f logs/monitor.log
+   ```
 
 ### Command Line Options
 
@@ -88,19 +89,25 @@ The monitor can be set up to run automatically in the background on login.
 - `--test-email`: Send a test email to verify configuration.
 - `--once`: Run a single check and exit.
 
-### 1. Run the Winning Strategy
+### 1. Run the Winning Strategy (TQQQ)
 This generates trade plots in `plots/trades_comparison.pdf` and `plots/custom_plot_covid.pdf`.
 ```bash
 python lrs_hybrid_sniper.py
 ```
 
-### 2. Generate Executive Report
+### 2. Run the SOXL Backtest
+This downloads data, executes the backtest, saves CSV results, and generates plots in `plots/soxl_equity_comparison.png` and `plots/soxl_trades.pdf`.
+```bash
+python lrs_soxl_backtest.py
+```
+
+### 3. Generate Executive Report
 This creates `results/LRS_Hybrid_Sniper_Report.pdf`.
 ```bash
 python generate_final_report.py
 ```
 
-### 3. Launch Web Dashboard (Live Monitor)
+### 4. Launch Web Dashboard (Live Monitor)
 Host a local interactive website to visualize the strategy with Entry/Exit flags.
 ```bash
 python web/app.py
@@ -114,3 +121,4 @@ Then open your browser to: [http://127.0.0.1:8050](http://127.0.0.1:8050)
 *   matplotlib
 *   reportlab
 *   flask
+

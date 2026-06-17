@@ -11,10 +11,16 @@
 
 <body>
     <header>
-        <div>
+        <div class="header-left">
             <h1>LRS Hybrid Sniper</h1>
             <span class="label">Real-Time Strategy Monitor</span>
         </div>
+
+        {% if status.refresh_time %}
+        <div class="header-center">
+            <span class="refresh-label">Last Refreshed: <span class="refresh-time">{{ status.refresh_time }}</span></span>
+        </div>
+        {% endif %}
 
         <div class="status-panel">
             <div class="metric-card {{ status.mode_class }}">
