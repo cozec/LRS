@@ -30,9 +30,8 @@ SMA_PERIOD = 200
 BUFFER = 0.02 # 2% buffer
 
 # Directories
-DATA_DIR = 'data'
-PLOTS_DIR = 'plots'
-RESULTS_DIR = 'results'
+from backtest_common import DATA_DIR, PLOTS_DIR, RESULTS_DIR  # noqa: E402
+import backtest_common as bc  # noqa: E402
 
 def calculate_signals(df):
     """Calculate 200-day SMA and generate buy/sell signals."""
@@ -317,17 +316,8 @@ def plot_trades(df, transactions):
             # Check if this trade is still open
             is_open = trade.get('Status', 'CLOSED') == 'OPEN'
             
-            # Exit Reason Logic
-            if is_open:
-                exit_reason = "STILL OPEN"
-            else:
-                # Check the Signal/Allocation on the EXIT DATE
-                exit_sig = subset.loc[subset.index == exit_date, 'Signal']
-                if not exit_sig.empty:
-                    last_alloc = exit_sig.iloc[0]
-                    exit_reason = "SMA Break" if last_alloc == 1.0 else "RSI Target"
-                else:
-                    exit_reason = "Exit"
+            # Exit Reason (from the trade log's actual allocation change)
+            exit_reason = trade.get('Exit_Reason', 'Exit')
 
             # Mark Entry
             spx_entry = subset.loc[subset.index >= entry_date, 'Close'].iloc[0] if not subset.loc[subset.index >= entry_date].empty else None
@@ -349,7 +339,7 @@ def plot_trades(df, transactions):
             if is_open:
                 title_text = f"Trade #{idx} ({trade_type} - Still Open) | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days)"
             else:
-                title_text = f"Trade #{idx} ({trade_type}) | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days)"
+                title_text = f"Trade #{idx} ({trade_type}) | {entry_date.date()} to {exit_date.date()} ({trade['Duration_Days']} days) | Exit: {exit_reason}"
             ax1.set_title(title_text, fontsize=10, fontweight='bold')
             ax1.set_ylabel('S&P 500', fontsize=8)
             ax1.legend(loc='upper left', fontsize='x-small')
@@ -586,141 +576,135 @@ def generate_transaction_log(df):
 
 
 
-def run_comparison(start_date='2010-01-01'):
-    """Run Comparison: SPX 3x vs TQQQ."""
-    print(f"\n{'='*80}")
-    print(f"Running COMPARISON Backtest: SPX 3x vs TQQQ (From {start_date})")
-    print(f"{'='*80}")
-    
-    # Download/Load and Align
-    sp500_path = os.path.join(DATA_DIR, 'sp500.csv')
-    ndx_path = os.path.join(DATA_DIR, 'ndx.csv')
-    tqqq_path = os.path.join(DATA_DIR, 'tqqq.csv')
-    upro_path = os.path.join(DATA_DIR, 'upro.csv')
-    
-    if os.path.exists(sp500_path) and os.path.exists(ndx_path) and os.path.exists(tqqq_path) and os.path.exists(upro_path):
-        print("Loading existing data...")
-        df = pd.read_csv(sp500_path, index_col=0, parse_dates=True)
-        ndx = pd.read_csv(ndx_path, index_col=0, parse_dates=True)
-        tqqq = pd.read_csv(tqqq_path, index_col=0, parse_dates=True)
-        upro = pd.read_csv(upro_path, index_col=0, parse_dates=True)
-    else:
-        df, ndx, tqqq, upro = download_data()
-    
-    # Align
-    common_idx = df.index.intersection(ndx.index)
-    df = df.loc[common_idx]
-    
-    # Preserve Real Prices for Plotting
-    # Reindex TQQQ and UPRO Close to match df index
-    df['TQQQ_Close'] = tqqq['Close'].reindex(df.index)
-    df['UPRO_Close'] = upro['Close'].reindex(df.index)
-    
-    # TQQQ Data Prep (Real Data Only)
-    tqqq_returns = tqqq['Close'].pct_change()
-    tqqq_returns = tqqq_returns.reindex(df.index)
-    
-    # Use real returns only; do not fillna with synthetic
-    df['TQQQ_Returns'] = tqqq_returns
+def baseline_regime(df):
+    """
+    LRS Baseline regime: 1 when MA10 > SMA200 * 1.02, 0 when MA10 < SMA200 * 0.98,
+    otherwise keep the previous state.
 
-    # UPRO Data Prep
-    upro_returns = upro['Close'].pct_change()
-    upro_returns = upro_returns.reindex(df.index)
-    df['UPRO_Returns'] = upro_returns
-    
-    # Calculate Signals (Hybrid Sniper Logic)
-    df = calculate_signals_sniper(df)
-    
-    # Calculate Returns (Sniper Logic)
-    # Signal is now 0.0, 0.5, or 1.0 representing TQQQ Allocation
-    
-    df['Cash_Return'] = RISK_FREE_RATE / 252
-    
-    # LRS Sniper Return = Signal * TQQQ + (1-Signal) * Cash
-    # We use numpy for vectorization
-    
-    signal = df['Signal']
-    tqqq_r = df['TQQQ_Returns'].fillna(0) # Handle NaN at start
-    cash_r = df['Cash_Return']
-    
-    df['LRS_Sniper_Return'] = signal * tqqq_r + (1 - signal) * cash_r
-    
-    # Standard LRS (for comparison) - Recalculate pure SMA strategy
-    # Original LRS: Risk One (1) if Close > SMA200 (approx), using our standard buffered logic
-    # But since we overwrote 'Signal', we need to re-derive a basic one for comparison or Just use the Benchmarks
-    # Let's derive a simple MA(10) > SMA(200) w/ 2% buffer for comparison
-    # Re-using logic inside a lambda or just manual calculation
-    
-    # Standard LRS Logic (Recalculated from scratch to be safe)
-    sma = df['SMA_200']
-    ma10 = df['MA_10']
-    upper = sma * 1.02
-    lower = sma * 0.98
-    
-    std_regime = []
-    curr = 0
-    for i in range(len(df)):
-        if pd.isna(ma10.iloc[i]) or pd.isna(sma.iloc[i]):
-            std_regime.append(0)
+    Parameters:
+    df (pd.DataFrame): Output of ``calculate_signals_sniper`` (needs MA_10, SMA_200).
+
+    Returns:
+    pd.Series: Regime (0.0 or 1.0) decided at each close.
+    """
+    upper = df['SMA_200'] * (1 + BUFFER)
+    lower = df['SMA_200'] * (1 - BUFFER)
+    regime = []
+    curr = 0.0
+    for ma10, up, low in zip(df['MA_10'].values, upper.values, lower.values):
+        if np.isnan(ma10) or np.isnan(up):
+            regime.append(0.0)
             continue
-        if ma10.iloc[i] > upper.iloc[i]: curr = 1
-        elif ma10.iloc[i] < lower.iloc[i]: curr = 0
-        std_regime.append(curr)
-    
-    df['Std_Regime'] = std_regime
-    df['Std_Signal'] = df['Std_Regime'].shift(1)
-    df['LRS_Standard_Return'] = np.where(df['Std_Signal'] == 1, df['TQQQ_Returns'], df['Cash_Return'])
-    
-    # Filter
-    df = df[df.index >= pd.Timestamp(start_date)]
-    
-    # Cum Returns
-    df['LRS_Sniper_Value'] = INITIAL_CAPITAL * (1 + df['LRS_Sniper_Return']).cumprod()
-    df['LRS_Standard_Value'] = INITIAL_CAPITAL * (1 + df['LRS_Standard_Return']).cumprod()
-    df['BH_TQQQ_Value'] = INITIAL_CAPITAL * (1 + df['TQQQ_Returns']).cumprod()
-    
-    # Ensure Return Columns exist for Metrics
-    df['BH_TQQQ_Return'] = df['TQQQ_Returns']
-    
-    # Metrics
-    metrics = {
-        'LRS Hybrid Sniper (RSI)': calculate_metrics(df, 'LRS_Sniper_Value'),
-        'LRS Standard (Baseline)': calculate_metrics(df, 'LRS_Standard_Value'),
-        'Buy-Hold TQQQ': calculate_metrics(df, 'BH_TQQQ_Value')
+        if ma10 > up:
+            curr = 1.0
+        elif ma10 < low:
+            curr = 0.0
+        regime.append(curr)
+    return pd.Series(regime, index=df.index)
+
+
+def run_comparison(start_date='2010-01-01'):
+    """
+    Backtest Hybrid Sniper vs LRS Baseline vs Buy & Hold TQQQ.
+
+    Signals come from the full S&P 500 history (no SMA warm-up inside the
+    window); the window starts at the first TQQQ bar on/after ``start_date``
+    and ends at the last bar shared by S&P 500 and TQQQ. Primary results
+    use next-open fills; market-on-close and 0% cash runs are reported as
+    labeled sensitivities (see backtest_common).
+
+    Parameters:
+    start_date (str): First date of the backtest window.
+
+    Returns:
+    tuple: (daily DataFrame, metrics dict for the next-open runs).
+    """
+    print(f"\n{'='*80}")
+    print(f"Running Hybrid Sniper Backtest on TQQQ (From {start_date})")
+    print(f"{'='*80}")
+
+    sp500 = bc.load_ohlcv('sp500')
+    tqqq = bc.load_ohlcv('tqqq')
+
+    # Signals on the full S&P 500 history, then align to TQQQ
+    sig = calculate_signals_sniper(sp500)
+    sig['Std_Regime'] = baseline_regime(sig)
+    tq = tqqq[['Open', 'Close']].rename(columns={'Open': 'TQQQ_Open', 'Close': 'TQQQ_Close'})
+    df = sig.join(tq, how='inner')
+    df = df[df.index >= pd.Timestamp(start_date)].copy()
+    print(f"Backtest window: {df.index[0].date()} to {df.index[-1].date()} ({len(df)} days)")
+
+    # Weight held during each session under next-open fills (used by plots)
+    df['Signal'] = bc.held_weights(df['Regime'])[1]
+    df['Std_Signal'] = bc.held_weights(df['Std_Regime'])[1]
+    df['TQQQ_Returns'] = df['TQQQ_Close'].pct_change().fillna(0.0)
+    spx_ret = df['Close'].pct_change().fillna(0.0)
+    bh_ret = df['TQQQ_Returns']
+
+    runs = {
+        'Hybrid Sniper': ('Regime', 'next_open', RISK_FREE_RATE),
+        'LRS Baseline': ('Std_Regime', 'next_open', RISK_FREE_RATE),
+        'Hybrid Sniper (MOC)': ('Regime', 'moc', RISK_FREE_RATE),
+        'LRS Baseline (MOC)': ('Std_Regime', 'moc', RISK_FREE_RATE),
+        'Hybrid Sniper (0% cash)': ('Regime', 'next_open', 0.0),
     }
-    
+    returns = {name: bc.strategy_returns(df[col], df['TQQQ_Open'], df['TQQQ_Close'], fill, cash)
+               for name, (col, fill, cash) in runs.items()}
+
+    df['LRS_Sniper_Return'] = returns['Hybrid Sniper']
+    df['LRS_Standard_Return'] = returns['LRS Baseline']
+    df['LRS_Sniper_Value'] = bc.equity_curve(df['LRS_Sniper_Return'])
+    df['LRS_Standard_Value'] = bc.equity_curve(df['LRS_Standard_Return'])
+    df['BH_TQQQ_Value'] = bc.buy_hold_equity(df['TQQQ_Close'])
+
+    all_metrics = {'Buy & Hold TQQQ': bc.performance_metrics(df['BH_TQQQ_Value'], bh_ret, bh_ret, spx_ret)}
+    for name, r in returns.items():
+        all_metrics[name] = bc.performance_metrics(bc.equity_curve(r), r, bh_ret, spx_ret)
+    fills = {'Buy & Hold TQQQ': 'close'}
+    fills.update({name: fill for name, (_, fill, _) in runs.items()})
+
     print("\n" + "=" * 80)
-    print("PERFORMANCE SUMMARY (Hybrid Sniper: RSI Re-Entry)")
+    print("PERFORMANCE SUMMARY (TQQQ; primary = next-open fills)")
     print("=" * 80)
-    print(f"{'Strategy':<30} {'CAGR':>12} {'Max DD':>12} {'Final Value':>15}")
+    print(f"{'Strategy':<26} {'CAGR':>9} {'Max DD':>9} {'Sharpe':>7} {'Final Value':>14}")
     print("-" * 80)
-    for strategy, m in metrics.items():
-        print(f"{strategy:<30} {m['CAGR']*100:>11.2f}% {m['Max_Drawdown']*100:>11.2f}% ${m['Final_Value']:>14,.0f}")
+    for name, m in sorted(all_metrics.items(), key=lambda kv: -kv[1]['Final_Value']):
+        print(f"{name:<26} {m['CAGR']*100:>8.2f}% {m['Max_Drawdown']*100:>8.2f}% "
+              f"{m['Sharpe']:>7.2f} ${m['Final_Value']:>13,.0f}")
     print("=" * 80)
-    
+
+    metrics_df = pd.DataFrame(all_metrics).T
+    metrics_df.insert(0, 'Fill', pd.Series(fills))
+    metrics_df.index.name = 'Strategy'
+    metrics_df['Start'] = df.index[0].date()
+    metrics_df['End'] = df.index[-1].date()
+    metrics_df.to_csv(os.path.join(RESULTS_DIR, 'hybrid_sniper_metrics.csv'))
+
     # Plot Overall Comparison
     plt.figure(figsize=(12, 6))
-    plt.semilogy(df.index, df['LRS_Sniper_Value'], label='LRS Sniper (RSI)', color='blue', linewidth=2)
+    plt.semilogy(df.index, df['LRS_Sniper_Value'], label='Hybrid Sniper', color='blue', linewidth=2)
     plt.semilogy(df.index, df['LRS_Standard_Value'], label='LRS Baseline', color='orange', linestyle='--')
-    plt.semilogy(df.index, df['BH_TQQQ_Value'], label='Buy-Hold TQQQ', color='gray', linestyle='--', alpha=0.5)
-    plt.title('Strategy Comparison: Hybrid Sniper (RSI) vs Baseline')
+    plt.semilogy(df.index, df['BH_TQQQ_Value'], label='Buy & Hold TQQQ', color='gray', linestyle='--', alpha=0.5)
+    plt.title('Hybrid Sniper vs Baseline vs Buy & Hold TQQQ (next-open fills)')
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.savefig(os.path.join(PLOTS_DIR, 'comparison_equity_sniper.png'))
     plt.savefig(os.path.join(PLOTS_DIR, 'comparison_equity_sniper.pdf'))
     plt.close()
-    
-    # Logs (Custom log for Sniper trades?)
-    # Simply log when Allocation > 0
-    transactions = generate_transaction_log(df)
+
+    transactions = bc.trade_log(df['Regime'], df['LRS_Sniper_Return'],
+                                df['TQQQ_Open'], df['TQQQ_Close'])
+    transactions = transactions.rename(columns={'Return_Asset': 'Return_TQQQ'})
     transactions.to_csv(os.path.join(RESULTS_DIR, 'transactions_hybrid_sniper.csv'))
-    
+    print(f"Trades: {len(transactions)}")
+
     plot_trades(df, transactions)
-    
+
     # Custom Plot: COVID Range
     plot_custom_range(df, '2020-01-01', '2022-03-31', 'custom_plot_covid.pdf')
-    
-    return df, metrics
+
+    return df, all_metrics
+
 
 def calculate_rsi(series, period=14):
     """Calculate RSI using Wilder's Smoothing (Exponential Weighted Moving Average).

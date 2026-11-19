@@ -1,91 +1,107 @@
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-import pandas as pd
+"""
+Build results/LRS_Hybrid_Sniper_Report.pdf from the backtest outputs.
+
+Every number comes from files written by src/lrs_hybrid_sniper.py
+(results/hybrid_sniper_metrics.csv, results/transactions_hybrid_sniper.csv);
+run that script first.
+"""
 import os
 
-# Paths
-RESULTS_DIR = 'results'
-PLOTS_DIR = 'plots'
+import pandas as pd
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
+PLOTS_DIR = os.path.join(PROJECT_ROOT, 'plots')
 OUTPUT_FILE = os.path.join(RESULTS_DIR, 'LRS_Hybrid_Sniper_Report.pdf')
 
+TABLE_STYLE = TableStyle([
+    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ('FONTSIZE', (0, 0), (-1, -1), 8),
+    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+])
+
+
+def pct(x):
+    """Format a fraction as a signed percentage."""
+    return f"{x * 100:+.2f}%"
+
+
+def money(x):
+    """Format a dollar amount."""
+    return f"${x:,.0f}"
+
+
+def performance_rows(metrics, names):
+    """Table rows for ``names`` ordered by final equity."""
+    rows = [['Strategy', 'Final Equity', 'Return', 'CAGR', 'Max DD', 'Sharpe', 'Alpha (TQQQ)', 'Beta (TQQQ)']]
+    sub = metrics.loc[names].sort_values('Final_Value', ascending=False)
+    for name, m in sub.iterrows():
+        rows.append([name, money(m.Final_Value), pct(m.Total_Return), pct(m.CAGR), pct(m.Max_Drawdown),
+                     f"{m.Sharpe:.2f}", pct(m.Alpha_BH), f"{m.Beta_BH:.2f}"])
+    return rows
+
+
 def create_report():
+    """Write the PDF report from the latest backtest results."""
+    metrics = pd.read_csv(os.path.join(RESULTS_DIR, 'hybrid_sniper_metrics.csv'), index_col=0)
+    trades = pd.read_csv(os.path.join(RESULTS_DIR, 'transactions_hybrid_sniper.csv'), index_col=0)
+    start, end = metrics['Start'].iloc[0], metrics['End'].iloc[0]
+    sniper, bh = metrics.loc['Hybrid Sniper'], metrics.loc['Buy & Hold TQQQ']
+
     print(f"Generating PDF Report: {OUTPUT_FILE}")
     doc = SimpleDocTemplate(OUTPUT_FILE, pagesize=letter)
-    story = []
-    
     styles = getSampleStyleSheet()
-    title_style = styles['Title']
-    heading_style = styles['Heading2']
-    text_style = styles['BodyText']
-    
-    # Title
-    story.append(Paragraph("LRS: Hybrid Sniper Strategy Report", title_style))
-    story.append(Spacer(1, 12))
-    
-    # Executive Summary
-    summary_text = """
-    <b>Strategy Objective:</b> Outperform Buy & Hold TQQQ while maintaining the defensive safety of the standard Leverage Rotation Strategy (LRS).<br/><br/>
-    <b>Hybrid Sniper Logic:</b><br/>
-    1. <b>Trend Filter (Safety):</b> Hold 100% TQQQ if Price > SMA 200.<br/>
-    2. <b>Sniper Entry (Aggressive):</b> Buy 50% TQQQ if Price < SMA 200 AND RSI(14) < 30 (Oversold).<br/>
-    3. <b>Sniper Exit:</b> Sell if RSI > 50 (Profit Take) OR Hold if Price crosses SMA 200 (Trend Confirmation).<br/><br/>
-    <b>Result:</b> This strategy beat Buy & Hold returns ($3.1M vs $2.7M) with significantly lower drawdown (-53% vs -81%).
+    story = [Paragraph("LRS: Hybrid Sniper Strategy Report", styles['Title']), Spacer(1, 12)]
+
+    verdict = "beat" if sniper.Final_Value > bh.Final_Value else "trailed"
+    summary_text = f"""
+    <b>Backtest window:</b> {start} to {end}, $10,000 start, TQQQ traded on S&amp;P 500 signals.<br/>
+    <b>Fills:</b> decide at the close, trade at the next open. Cash earns 3%/yr; no commissions or slippage.<br/><br/>
+    <b>Hybrid Sniper logic (signals on the S&amp;P 500):</b><br/>
+    1. <b>Trend (100% TQQQ):</b> enter when MA10 &gt; SMA200 x 1.02; exit to cash when MA10 &lt; SMA200 x 0.98.<br/>
+    2. <b>Sniper (50% TQQQ):</b> while MA10 &lt; SMA200 x 0.98 and in cash, buy when RSI(14) &lt; 30.<br/>
+    3. <b>Sniper exit:</b> back to cash when RSI(14) &gt; 50, or promoted to Trend on MA10 &gt; SMA200 x 1.02.<br/><br/>
+    <b>Result:</b> the Hybrid Sniper {verdict} Buy &amp; Hold TQQQ ({money(sniper.Final_Value)} vs
+    {money(bh.Final_Value)}) with a max drawdown of {pct(sniper.Max_Drawdown)} vs {pct(bh.Max_Drawdown)}.
     """
-    story.append(Paragraph(summary_text, text_style))
-    story.append(Spacer(1, 12))
-    
-    # Performance Table (Manually constructed from known results)
-    data = [
-        ['Strategy', 'CAGR', 'Max Drawdown', 'Final Value ($10k)'],
-        ['Buy & Hold TQQQ', '42.17%', '-81.66%', '$2,716,246'],
-        ['LRS Baseline (Buffer)', '38.50%', '-53.23%', '$1,792,759'],
-        ['Hybrid Sniper (RSI)', '43.46%', '-53.69%', '$3,126,043']
-    ]
-    
-    table = Table(data, colWidths=[150, 80, 100, 100])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, 3), (-1, 3), colors.lightgreen) # Highlight Winner
-    ]))
-    story.append(table)
-    story.append(Spacer(1, 24))
-    
-    # Equity Curve Plot
+    story += [Paragraph(summary_text, styles['BodyText']), Spacer(1, 12)]
+
+    table = Table(performance_rows(metrics, ['Buy & Hold TQQQ', 'Hybrid Sniper', 'LRS Baseline']))
+    table.setStyle(TABLE_STYLE)
+    story += [table, Spacer(1, 12)]
+
+    story.append(Paragraph("<b>Sensitivity</b> (fill convention and cash rate):", styles['BodyText']))
+    sens = Table(performance_rows(metrics, ['Hybrid Sniper', 'Hybrid Sniper (MOC)', 'Hybrid Sniper (0% cash)',
+                                            'LRS Baseline', 'LRS Baseline (MOC)']))
+    sens.setStyle(TABLE_STYLE)
+    story += [sens, Spacer(1, 18)]
+
     equity_plot = os.path.join(PLOTS_DIR, 'comparison_equity_sniper.png')
     if os.path.exists(equity_plot):
-        im = Image(equity_plot, width=500, height=300)
-        story.append(im)
-        story.append(Paragraph("<b>Figure 1:</b> Equity curve showing the Hybrid Sniper (Blue) outperforming both Baseline (Orange) and Buy & Hold (Gray). Note the reduced drawdown in 2022 compared to Buy & Hold.", text_style))
-    
-    story.append(PageBreak())
-    
-    # Trade Analysis
-    story.append(Paragraph("Detailed Trade Analysis", title_style))
-    story.append(Paragraph("The following plots detail every trade generated by the strategy. Note the 'Sniper (RSI)' trades which enter when Price is below SMA 200 but RSI is Oversold (Green Zone).", text_style))
-    story.append(Spacer(1, 12))
-    
-    # Add all trade plots from the PDF (We can't merge PDFs easily here without pypdf, 
-    # but we can try to find individual plots if we saved them, or just rely on the existing multi-page PDF 
-    # generated by the script. Since the script generates a PDF 'trades_comparison.pdf', 
-    # we might just tell the user about it, but here let's finish this summary report.)
-    
-    # Wait, the script generates a separate 'trades_comparison.pdf'. 
-    # The user asked to "add new info to all the plots in pdf". 
-    # My previous step updated 'trades_comparison.pdf' to include RSI.
-    # This script generates a high-level summary report.
-    
-    story.append(Paragraph("<b>Note:</b> Please refer to 'plots/trades_comparison.pdf' for the detailed multi-panel view of every individual trade, including the new RSI indicator panel.", text_style))
-    
+        story.append(Image(equity_plot, width=500, height=250))
+        story.append(Paragraph("<b>Figure 1:</b> Equity curves (log scale), next-open fills.", styles['BodyText']))
+
+    story += [PageBreak(), Paragraph("Trade Log", styles['Title'])]
+    rows = [['Entry (open)', 'Exit (open)', 'Days', 'Type', 'Exit Reason', 'Strategy', 'TQQQ']]
+    for _, t in trades.iterrows():
+        rows.append([t.Entry_Date, t.Exit_Date if t.Status == 'CLOSED' else f"{t.Exit_Date} (open)",
+                     t.Duration_Days, t.Type, t.Exit_Reason, pct(t.Return_Strategy), pct(t.Return_TQQQ)])
+    log_table = Table(rows)
+    log_table.setStyle(TABLE_STYLE)
+    story += [log_table, Spacer(1, 12),
+              Paragraph("See plots/trades_comparison.pdf for a chart of every trade.", styles['BodyText'])]
+
     doc.build(story)
     print("PDF Generation Complete.")
+
 
 if __name__ == "__main__":
     create_report()

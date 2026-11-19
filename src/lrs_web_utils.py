@@ -3,8 +3,8 @@ import numpy as np
 import os
 from datetime import datetime, time
 import pytz
-import yfinance as yf
 from lrs_hybrid_sniper import calculate_rsi, calculate_signals_sniper, calculate_returns
+from update_data import TICKERS, download_ohlcv, save_csv, last_bar_is_final
 
 # Use absolute path relative to project root (one level up from src/)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -14,37 +14,23 @@ RISK_FREE_RATE = 0.03
 
 def download_fresh_data():
     """
-    Download fresh data from yfinance for all required symbols.
-    If market is open, current price is treated as 'close'.
-    Returns dict of dataframes.
+    Download fresh S&P 500, TQQQ and VIX bars from yfinance.
+
+    While the market is open the last row of each frame is the current,
+    still-trading session (used for the dashboard's provisional view).
+
+    Returns:
+    dict: DataFrames keyed 'sp500', 'tqqq', 'vix'.
+
+    Raises:
+    ValueError: If any download comes back empty.
     """
     print("[REFRESH] Downloading fresh data from yfinance...")
-    
-    # Download S&P 500
-    sp500 = yf.download('^GSPC', start='2000-01-01', progress=False, auto_adjust=False)
-    if isinstance(sp500.columns, pd.MultiIndex):
-        sp500.columns = sp500.columns.get_level_values(0)
-    sp500 = sp500.ffill().bfill()
-    
-    # Download TQQQ
-    tqqq = yf.download('TQQQ', start='2010-02-09', progress=False, auto_adjust=False)
-    if isinstance(tqqq.columns, pd.MultiIndex):
-        tqqq.columns = tqqq.columns.get_level_values(0)
-    tqqq = tqqq.ffill().bfill()
-    
-    # Download VIX
-    vix = yf.download('^VIX', start='2000-01-01', progress=False, auto_adjust=False)
-    if isinstance(vix.columns, pd.MultiIndex):
-        vix.columns = vix.columns.get_level_values(0)
-    vix = vix.ffill().bfill()
-    
-    print(f"[REFRESH] SP500 last date: {sp500.index[-1]}, TQQQ last date: {tqqq.index[-1]}")
-    
-    return {
-        'sp500': sp500,
-        'tqqq': tqqq,
-        'vix': vix
-    }
+    data = {name: download_ohlcv(*TICKERS[name])
+            for name in ('sp500', 'tqqq', 'vix')}
+    print(f"[REFRESH] SP500 last date: {data['sp500'].index[-1]}, "
+          f"TQQQ last date: {data['tqqq'].index[-1]}")
+    return data
 
 def get_hybrid_sniper_data(force_refresh=False):
     """
@@ -53,17 +39,20 @@ def get_hybrid_sniper_data(force_refresh=False):
     
     If force_refresh=True, download fresh data from yfinance.
     """
+    data = None
     if force_refresh:
-        # Download fresh data from yfinance
-        data = download_fresh_data()
+        try:
+            data = download_fresh_data()
+        except Exception as e:
+            print(f"[REFRESH] Download failed ({e}); using cached CSVs.")
+
+    if data is not None:
         df = data['sp500'].copy()
         tqqq = data['tqqq']
-        vix = data['vix']
-        
-        # Save to CSV for future use
-        df.to_csv(os.path.join(DATA_DIR, 'sp500.csv'))
-        tqqq.to_csv(os.path.join(DATA_DIR, 'tqqq.csv'))
-        vix.to_csv(os.path.join(DATA_DIR, 'vix.csv'))
+
+        # Save only completed bars, atomically (see update_data.save_csv)
+        for name, frame in data.items():
+            save_csv(frame, os.path.join(DATA_DIR, f'{name}.csv'))
     else:
         # Load from CSV files
         sp500_path = os.path.join(DATA_DIR, 'sp500.csv')
@@ -73,6 +62,9 @@ def get_hybrid_sniper_data(force_refresh=False):
             df = pd.read_csv(sp500_path, index_col=0, parse_dates=True)
             tqqq = pd.read_csv(tqqq_path, index_col=0, parse_dates=True)
         else:
+            if force_refresh:
+                raise FileNotFoundError(
+                    "Download failed and no cached CSVs in data/")
             # Fallback to fresh download
             return get_hybrid_sniper_data(force_refresh=True)
         
@@ -140,7 +132,9 @@ def get_latest_signals(df):
         'regime': last_row['Regime'],
         'trend_signal': "BULL" if last_row['Close'] > last_row['SMA_200'] else "BEAR",
         'sniper_signal': "OVERSOLD" if last_row['RSI'] < 30 else "NEUTRAL",
-        'refresh_time': refresh_time
+        'refresh_time': refresh_time,
+        # Last bar is today's still-trading session, not a final close
+        'provisional': not last_bar_is_final(df)
     }
     
     # Determine Mode Text

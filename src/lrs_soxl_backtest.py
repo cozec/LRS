@@ -20,9 +20,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 warnings.filterwarnings('ignore')
 
+import backtest_common as bc  # noqa: E402
+
 # Configuration
-INITIAL_CAPITAL = 10000
-RISK_FREE_RATE = 0.03  # 3% annual cash return
+INITIAL_CAPITAL = bc.INITIAL_CAPITAL
+RISK_FREE_RATE = bc.RISK_FREE_RATE  # 3% annual cash return
 SMA_PERIOD = 200
 MA_SHORT = 10
 BUFFER = 0.02  # 2% buffer
@@ -109,11 +111,18 @@ def load_data():
     sp500['Upper_Band'] = sp500['SMA_200'] * (1 + BUFFER)
     sp500['Lower_Band'] = sp500['SMA_200'] * (1 - BUFFER)
     
-    # Join SOXL Close
-    df = sp500[['Close', 'SMA_200', 'MA_10', 'RSI', 'Upper_Band', 'Lower_Band']].copy()
-    df.columns = ['SP500_Close', 'SMA_200', 'MA_10', 'RSI', 'Upper_Band', 'Lower_Band']
-    
-    df = df.join(soxl[['Close']].rename(columns={'Close': 'SOXL_Close'}), how='inner')
+    # Run both state machines on the FULL S&P 500 history, so the regime at
+    # SOXL's first day does not depend on where the window starts
+    sp500 = calculate_baseline_signal(sp500)
+    sp500 = calculate_sniper_signal(sp500)
+
+    # Join SOXL Open/Close
+    df = sp500[['Close', 'SMA_200', 'MA_10', 'RSI', 'Upper_Band', 'Lower_Band',
+                'Baseline_Regime', 'Sniper_Regime']].copy()
+    df = df.rename(columns={'Close': 'SP500_Close'})
+
+    df = df.join(soxl[['Open', 'Close']].rename(columns={'Open': 'SOXL_Open', 'Close': 'SOXL_Close'}),
+                 how='inner')
     df = df.dropna(subset=['SOXL_Close'])
     
     print(f"SOXL Alignment Date Range: {df.index[0].date()} to {df.index[-1].date()}")
@@ -214,74 +223,43 @@ def calculate_sniper_signal(df):
     return df
 
 
-def calculate_returns(df):
+def calculate_returns(df, fill='next_open', cash_rate=RISK_FREE_RATE):
     """
-    Calculate daily returns for Buy & Hold, Baseline, and Hybrid Sniper strategies.
+    Calculate daily returns and equity for Buy & Hold, Baseline and Hybrid Sniper.
 
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
+    df (pd.DataFrame): Aligned S&P 500 / SOXL data with regime columns.
+    fill (str): 'next_open' (primary) or 'moc' (market-on-close), see backtest_common.
+    cash_rate (float): Annual return on cash.
 
     Returns:
-    pd.DataFrame: DataFrame with strategy return columns.
+    pd.DataFrame: DataFrame with return and value columns.
     """
     df = df.copy()
-    
-    # SOXL daily returns
     df['SOXL_Return'] = df['SOXL_Close'].pct_change().fillna(0)
-    
-    # SP500 daily returns (for Alpha/Beta calculations)
     df['SP500_Return'] = df['SP500_Close'].pct_change().fillna(0)
-    
-    # Cash daily return
-    df['Cash_Return'] = RISK_FREE_RATE / 252
-    
-    # Buy & Hold SOXL daily return
     df['BH_Return'] = df['SOXL_Return']
-    
-    # Baseline return
-    df['Baseline_Return'] = np.where(
-        df['Baseline_Signal'] == 1,
-        df['SOXL_Return'],
-        df['Cash_Return']
-    )
-    
-    # Hybrid Sniper return
-    df['Sniper_Return'] = df['Sniper_Signal'] * df['SOXL_Return'] + \
-                          (1 - df['Sniper_Signal']) * df['Cash_Return']
-                          
-    return df
 
+    # Weight held during each session (next-open), used by plots/logs
+    df['Baseline_Signal'] = bc.held_weights(df['Baseline_Regime'])[1]
+    df['Sniper_Signal'] = bc.held_weights(df['Sniper_Regime'])[1]
 
-def calculate_cumulative_returns(df):
-    """
-    Calculate cumulative values for all strategies.
+    df['Baseline_Return'] = bc.strategy_returns(df['Baseline_Regime'], df['SOXL_Open'],
+                                                df['SOXL_Close'], fill, cash_rate)
+    df['Sniper_Return'] = bc.strategy_returns(df['Sniper_Regime'], df['SOXL_Open'],
+                                              df['SOXL_Close'], fill, cash_rate)
 
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-
-    Returns:
-    pd.DataFrame: DataFrame with cumulative value columns.
-    """
-    df = df.copy()
-    
-    # For Buy & Hold, use the exact formula $10,000 * (last_close / first_close)
-    first_soxl = df['SOXL_Close'].iloc[0]
-    df['BH_Value'] = INITIAL_CAPITAL * (df['SOXL_Close'] / first_soxl)
-    
-    # For S&P 500 buy & hold (reference)
-    first_sp500 = df['SP500_Close'].iloc[0]
-    df['SP500_Value'] = INITIAL_CAPITAL * (df['SP500_Close'] / first_sp500)
-    
-    # For active strategies: Compound daily returns
-    df['Baseline_Value'] = INITIAL_CAPITAL * (1 + df['Baseline_Return']).cumprod()
-    df['Sniper_Value'] = INITIAL_CAPITAL * (1 + df['Sniper_Return']).cumprod()
-    
+    # Buy & Hold uses the exact formula $10,000 * (close / first_close)
+    df['BH_Value'] = bc.buy_hold_equity(df['SOXL_Close'])
+    df['SP500_Value'] = bc.buy_hold_equity(df['SP500_Close'])
+    df['Baseline_Value'] = bc.equity_curve(df['Baseline_Return'])
+    df['Sniper_Value'] = bc.equity_curve(df['Sniper_Return'])
     return df
 
 
 def calculate_metrics(values, daily_returns, benchmark_returns, sp500_returns):
     """
-    Calculate professional performance metrics.
+    Calculate professional performance metrics (see backtest_common.performance_metrics).
 
     Parameters:
     values (pd.Series): Portfolio equity values.
@@ -292,135 +270,21 @@ def calculate_metrics(values, daily_returns, benchmark_returns, sp500_returns):
     Returns:
     dict: Performance metrics.
     """
-    days = len(values)
-    years = days / 252
-    
-    final_value = values.iloc[-1]
-    total_return = (final_value / INITIAL_CAPITAL) - 1
-    cagr = (final_value / INITIAL_CAPITAL) ** (1 / years) - 1
-    
-    # Max DD
-    running_max = values.cummax()
-    drawdown = (values - running_max) / running_max
-    max_dd = drawdown.min()
-    
-    # Volatility
-    volatility = daily_returns.std() * np.sqrt(252)
-    
-    # Sharpe
-    excess_returns = daily_returns - (RISK_FREE_RATE / 252)
-    sharpe = (excess_returns.mean() * 252) / volatility if volatility > 0 else 0
-    
-    # Sortino
-    downside_returns = daily_returns[daily_returns < 0]
-    downside_std = downside_returns.std() * np.sqrt(252)
-    sortino = (daily_returns.mean() * 252 - RISK_FREE_RATE) / downside_std if downside_std > 0 else 0
-    
-    # Calmar
-    calmar = cagr / abs(max_dd) if max_dd != 0 else 0
-    
-    # Beta relative to Buy & Hold of the asset itself
-    df_cov_bh = pd.DataFrame({'strat': daily_returns, 'bench': benchmark_returns}).dropna()
-    cov_matrix_bh = np.cov(df_cov_bh['strat'], df_cov_bh['bench'])
-    beta_bh = cov_matrix_bh[0, 1] / cov_matrix_bh[1, 1] if cov_matrix_bh[1, 1] != 0 else 0.0
-    
-    # Alpha relative to Buy & Hold of the asset
-    strat_ann = (1 + df_cov_bh['strat']).prod() ** (252 / len(df_cov_bh)) - 1
-    bench_ann = (1 + df_cov_bh['bench']).prod() ** (252 / len(df_cov_bh)) - 1
-    alpha_bh = (strat_ann - RISK_FREE_RATE) - beta_bh * (bench_ann - RISK_FREE_RATE)
-    
-    # Beta relative to S&P 500 (broad market index)
-    df_cov_spx = pd.DataFrame({'strat': daily_returns, 'spx': sp500_returns}).dropna()
-    cov_matrix_spx = np.cov(df_cov_spx['strat'], df_cov_spx['spx'])
-    beta_spx = cov_matrix_spx[0, 1] / cov_matrix_spx[1, 1] if cov_matrix_spx[1, 1] != 0 else 0.0
-    
-    # Alpha relative to S&P 500 (broad market index)
-    spx_ann = (1 + df_cov_spx['spx']).prod() ** (252 / len(df_cov_spx)) - 1
-    alpha_spx = (strat_ann - RISK_FREE_RATE) - beta_spx * (spx_ann - RISK_FREE_RATE)
-    
-    return {
-        'Final_Value': final_value,
-        'Total_Return': total_return,
-        'CAGR': cagr,
-        'Max_Drawdown': max_dd,
-        'Volatility': volatility,
-        'Sharpe': sharpe,
-        'Sortino': sortino,
-        'Calmar': calmar,
-        'Beta_BH': beta_bh,
-        'Alpha_BH': alpha_bh,
-        'Beta_SPX': beta_spx,
-        'Alpha_SPX': alpha_spx
-    }
+    return bc.performance_metrics(values, daily_returns, benchmark_returns, sp500_returns)
 
 
 def generate_transaction_log(df):
     """
-    Generate a transaction log for the Hybrid Sniper strategy on SOXL.
+    Generate the Hybrid Sniper SOXL trade log under next-open fills.
 
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
+    df (pd.DataFrame): Output of ``calculate_returns`` with fill='next_open'.
 
     Returns:
-    pd.DataFrame: Trade log DataFrame.
+    pd.DataFrame: Trade log DataFrame (see backtest_common.trade_log).
     """
-    df = df.dropna(subset=['Sniper_Signal']).copy()
-    trades = []
-    in_trade = False
-    entry_date = None
-    entry_type = "Unknown"
-    entry_idx = 0
-    
-    for i in range(len(df)):
-        signal = df['Sniper_Signal'].iloc[i]
-        
-        # Entry
-        if signal > 0 and not in_trade:
-            in_trade = True
-            entry_idx = i
-            entry_date = df.index[i]
-            entry_type = "Sniper (RSI)" if signal == 0.5 else "Trend (SMA)"
-            
-        # Exit
-        elif in_trade and signal == 0:
-            in_trade = False
-            exit_date = df.index[i]
-            
-            trade_returns = df['Sniper_Return'].iloc[entry_idx:i+1]
-            trade_ret = (1 + trade_returns).prod() - 1
-            
-            soxl_returns = df['SOXL_Return'].iloc[entry_idx:i+1]
-            soxl_ret = (1 + soxl_returns).prod() - 1
-            
-            trades.append({
-                'Entry_Date': entry_date,
-                'Exit_Date': exit_date,
-                'Duration_Days': (exit_date - entry_date).days,
-                'Type': entry_type,
-                'Status': 'CLOSED',
-                'Return_Strategy': trade_ret,
-                'Return_SOXL': soxl_ret
-            })
-            
-    # Open trade at end (still active, NOT a real exit)
-    if in_trade:
-        exit_date = df.index[-1]
-        trade_returns = df['Sniper_Return'].iloc[entry_idx:]
-        trade_ret = (1 + trade_returns).prod() - 1
-        soxl_returns = df['SOXL_Return'].iloc[entry_idx:]
-        soxl_ret = (1 + soxl_returns).prod() - 1
-        
-        trades.append({
-            'Entry_Date': entry_date,
-            'Exit_Date': exit_date,
-            'Duration_Days': (exit_date - entry_date).days,
-            'Type': entry_type,
-            'Status': 'OPEN',
-            'Return_Strategy': trade_ret,
-            'Return_SOXL': soxl_ret
-        })
-        
-    return pd.DataFrame(trades)
+    log = bc.trade_log(df['Sniper_Regime'], df['Sniper_Return'], df['SOXL_Open'], df['SOXL_Close'])
+    return log.rename(columns={'Return_Asset': 'Return_SOXL'})
 
 
 def plot_results(df):
@@ -526,7 +390,7 @@ def plot_trades(df, transactions):
                              
             trade_type = trade.get('Type', 'Unknown')
             ret_str = f"{trade['Return_Strategy']*100:+.1f}%"
-            title_text = f"Trade #{idx+1} ({trade_type}) | {entry_date.date()} to {exit_date.date()} | {trade['Duration_Days']} days | Return: {ret_str}"
+            title_text = f"Trade #{idx+1} ({trade_type}) | {entry_date.date()} to {exit_date.date()} | {trade['Duration_Days']} days | Return: {ret_str} | Exit: {trade.get('Exit_Reason', '')}"
             ax1.set_title(title_text, fontsize=10, fontweight='bold')
             ax1.set_ylabel('S&P 500', fontsize=9)
             ax1.legend(loc='upper left', fontsize='x-small')
@@ -580,65 +444,54 @@ def plot_trades(df, transactions):
 
 
 def main():
-    """Main execution function for the backtest."""
+    """Run the SOXL backtest: next-open primary, MOC and 0% cash sensitivities."""
     print("=" * 80)
     print("LRS SOXL BACKTEST (Inception - Present)")
     print("=" * 80)
-    
-    # Load and align data
-    df = load_data()
-    
-    # Calculate strategy signals
-    df = calculate_baseline_signal(df)
-    df = calculate_sniper_signal(df)
-    
-    # Calculate strategy returns
-    df = calculate_returns(df)
-    
-    # Calculate cumulative returns
-    df = calculate_cumulative_returns(df)
-    
-    # Slice to final period where metrics are valid
-    df = df.dropna(subset=['SMA_200'])
-    
-    # Calculate metrics
+
+    data = load_data()
+    df = calculate_returns(data, 'next_open')
+    moc = calculate_returns(data, 'moc')
+    no_cash = calculate_returns(data, 'next_open', cash_rate=0.0)
+
+    bh, spx = df['BH_Return'], df['SP500_Return']
     metrics = {
-        'Buy & Hold SOXL': calculate_metrics(df['BH_Value'], df['BH_Return'], df['BH_Return'], df['SP500_Return']),
-        'LRS Baseline': calculate_metrics(df['Baseline_Value'], df['Baseline_Return'], df['BH_Return'], df['SP500_Return']),
-        'Hybrid Sniper': calculate_metrics(df['Sniper_Value'], df['Sniper_Return'], df['BH_Return'], df['SP500_Return'])
+        'Buy & Hold SOXL': calculate_metrics(df['BH_Value'], bh, bh, spx),
+        'LRS Baseline': calculate_metrics(df['Baseline_Value'], df['Baseline_Return'], bh, spx),
+        'Hybrid Sniper': calculate_metrics(df['Sniper_Value'], df['Sniper_Return'], bh, spx),
+        'LRS Baseline (MOC)': calculate_metrics(moc['Baseline_Value'], moc['Baseline_Return'], bh, spx),
+        'Hybrid Sniper (MOC)': calculate_metrics(moc['Sniper_Value'], moc['Sniper_Return'], bh, spx),
+        'Hybrid Sniper (0% cash)': calculate_metrics(no_cash['Sniper_Value'], no_cash['Sniper_Return'], bh, spx),
     }
-    
-    # Print metrics
+    fills = {'Buy & Hold SOXL': 'close', 'LRS Baseline': 'next_open', 'Hybrid Sniper': 'next_open',
+             'LRS Baseline (MOC)': 'moc', 'Hybrid Sniper (MOC)': 'moc', 'Hybrid Sniper (0% cash)': 'next_open'}
+
     print("\n" + "=" * 80)
-    print("PERFORMANCE SUMMARY (SOXL)")
+    print("PERFORMANCE SUMMARY (SOXL; primary = next-open fills)")
     print("=" * 80)
-    print(f"{'Strategy':<20} {'CAGR':>10} {'Max DD':>10} {'Sharpe':>8} {'Beta (SPX)':>10} {'Alpha (SPX)':>12} {'Final Value':>15}")
+    print(f"{'Strategy':<24} {'CAGR':>9} {'Max DD':>9} {'Sharpe':>7} {'Beta(SPX)':>9} {'Alpha(SPX)':>10} {'Final Value':>14}")
     print("-" * 80)
-    
-    # Sort strategies by final equity descending
-    sorted_strategies = sorted(metrics.items(), key=lambda x: x[1]['Final_Value'], reverse=True)
-    
-    for name, m in sorted_strategies:
-        print(f"{name:<20} {m['CAGR']*100:>9.2f}% {m['Max_Drawdown']*100:>9.2f}% "
-              f"{m['Sharpe']:>8.2f} {m['Beta_SPX']:>10.2f} {m['Alpha_SPX']*100:>11.2f}% ${m['Final_Value']:>14,.0f}")
+    for name, m in sorted(metrics.items(), key=lambda x: x[1]['Final_Value'], reverse=True):
+        print(f"{name:<24} {m['CAGR']*100:>8.2f}% {m['Max_Drawdown']*100:>8.2f}% "
+              f"{m['Sharpe']:>7.2f} {m['Beta_SPX']:>9.2f} {m['Alpha_SPX']*100:>9.2f}% ${m['Final_Value']:>13,.0f}")
     print("=" * 80)
-    
-    # Save performance metrics to CSV
+
     metrics_df = pd.DataFrame(metrics).T
+    metrics_df.insert(0, 'Fill', pd.Series(fills))
+    metrics_df.index.name = 'Strategy'
+    metrics_df['Start'] = df.index[0].date()
+    metrics_df['End'] = df.index[-1].date()
     metrics_df.to_csv(os.path.join(RESULTS_DIR, 'soxl_performance_summary.csv'))
-    
-    # Generate transaction log
+
     trades = generate_transaction_log(df)
     trades.to_csv(os.path.join(RESULTS_DIR, 'transactions_soxl.csv'), index=False)
     print(f"Total trades for Hybrid Sniper SOXL: {len(trades)}")
-    
-    # Save full historical backtest data for visual verification if needed
+
     df.to_csv(os.path.join(RESULTS_DIR, 'soxl_backtest_daily.csv'))
-    
-    # Plots
+
     plot_results(df)
     plot_trades(df, trades)
-    
+
     return df, metrics, trades
 
 

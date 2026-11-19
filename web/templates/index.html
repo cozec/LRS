@@ -19,6 +19,9 @@
         {% if status.refresh_time %}
         <div class="header-center">
             <span class="refresh-label">Last Refreshed: <span class="refresh-time">{{ status.refresh_time }}</span></span>
+            {% if status.provisional %}
+            <span class="refresh-label">Header values use today's intraday price (provisional until the close); the chart shows completed closes.</span>
+            {% endif %}
         </div>
         {% endif %}
 

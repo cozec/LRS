@@ -20,16 +20,17 @@ Video reference: https://www.youtube.com/watch?v=cuYIx3ZxNr4&t=1s
 *   **Logic:** Rotates into **SHV (Short Treasuries)** or **TMF (3x Long Treasuries)** instead of theoretical Cash.
 *   **Verdict:** SHV works perfectly as a Cash proxy. TMF **FAILED** due to the 2022 stock/bond correlation breakdown.
 
-### 4. Hybrid Sniper (THE WINNER)
+### 4. Hybrid Sniper (Best Active Strategy)
 *   **Logic:** Solves the "MA Lag" problem using RSI for early entries.
     *   **Trend Entry:** 100% TQQQ if `MA10 > MA200 * 1.02`.
     *   **Trend Exit:** Cash if `MA10 < MA200 * 0.98`.
     *   **Sniper Entry:** 50% TQQQ if in Bear zone AND `RSI(14) < 30` (Oversold).
     *   **Sniper Exit:** Sell if `RSI(14) > 50` (Profit Take).
 *   **Note:** All indicators (MA10, MA200, RSI) are calculated from S&P 500 price.
-*   **Verdict:** **Active Alpha.** Beats Buy & Hold TQQQ while maintaining the safety profile of the Baseline LRS.
-    *   **CAGR:** 43.46% (vs 42% Buy & Hold)
-    *   **Max Drawdown:** -53.69% (vs -81.66% Buy & Hold)
+*   **Verdict (2010-02-11 to 2026-11-19, next-open fills):** Best risk-adjusted result, but it does **not** beat Buy & Hold TQQQ on final equity. See `summary.md` for full metrics.
+    *   **Final Equity:** \$2.09M (vs \$2.39M Buy & Hold, \$1.29M Baseline)
+    *   **CAGR:** 37.50% (vs 38.62% Buy & Hold)
+    *   **Max Drawdown:** -52.75% (vs -81.66% Buy & Hold); Sharpe 0.84 vs 0.79
 
 ## Project Structure
 *   `lrs_backtest.py`: Standard Baseline backtest.
@@ -40,9 +41,16 @@ Video reference: https://www.youtube.com/watch?v=cuYIx3ZxNr4&t=1s
 
 ## Usage
 
+### Market Data
+All CSVs in `data/` come from one downloader:
+```bash
+python src/update_data.py      # all tickers; or e.g. python src/get_tqqq.py for one
+```
+Each file has columns `Date, Open, High, Low, Close, Volume`, with `Close` adjusted for splits and dividends (total return). Today's bar is only saved after the close, and files are replaced atomically. If a download fails, the existing file is left unchanged and the dashboard falls back to it.
+
 ### Live Monitoring and Alerts
 
-The project includes an automated monitoring system for the 'Hybrid Sniper' strategy. It runs hourly during market hours and sends email alerts for signal changes.
+The project includes an automated monitoring system for the 'Hybrid Sniper' strategy. After each market close (16:15 ET) it evaluates the completed daily bar and emails an alert when the close's decision changes the allocation, for execution at the next open. A failed email is retried on the next check (every 30 min).
 
 ### Setup
 
@@ -66,6 +74,7 @@ The project includes an automated monitoring system for the 'Hybrid Sniper' stra
 
 The monitor can be set up to run automatically in the background on login.
 
+- **Install (once):** `cp com.user.hybrid_sniper_monitor.plist ~/Library/LaunchAgents/`
 - **Start/Load Service:**
    ```bash
    launchctl load ~/Library/LaunchAgents/com.user.hybrid_sniper_monitor.plist
@@ -87,24 +96,24 @@ The monitor can be set up to run automatically in the background on login.
 
 - `--dry-run`: Run the monitor without sending emails.
 - `--test-email`: Send a test email to verify configuration.
-- `--once`: Run a single check and exit.
+- `--once`: Check the latest completed close now and exit (first run records the state without alerting).
 
-### 1. Run the Winning Strategy (TQQQ)
+### 1. Run the Hybrid Sniper Backtest (TQQQ)
 This generates trade plots in `plots/trades_comparison.pdf` and `plots/custom_plot_covid.pdf`.
 ```bash
-python lrs_hybrid_sniper.py
+python src/lrs_hybrid_sniper.py
 ```
 
 ### 2. Run the SOXL Backtest
-This downloads data, executes the backtest, saves CSV results, and generates plots in `plots/soxl_equity_comparison.png` and `plots/soxl_trades.pdf`.
+This loads data from `data/`, executes the backtest, saves CSV results, and generates plots in `plots/soxl_equity_comparison.png` and `plots/soxl_trades.pdf`.
 ```bash
-python lrs_soxl_backtest.py
+python src/lrs_soxl_backtest.py
 ```
 
 ### 3. Generate Executive Report
-This creates `results/LRS_Hybrid_Sniper_Report.pdf`.
+This creates `results/LRS_Hybrid_Sniper_Report.pdf` from the latest backtest results (run step 1 first). `python src/summary_tables.py` prints the markdown tables used in `summary.md`.
 ```bash
-python generate_final_report.py
+python src/generate_final_report.py
 ```
 
 ### 4. Launch Web Dashboard (Live Monitor)
